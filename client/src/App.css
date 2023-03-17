@@ -1,0 +1,118 @@
+/* h1 {
+  font-size: 2em;
+  padding-top: 1em;
+  color: skyblue;
+}
+
+h2 {
+  font-size: 1.7em;
+  color: skyblue;
+}
+
+h3 {
+  font-size: 1.3em;
+  color: skyblue;
+} */
+/* 
+label, .label {
+  color: skyblue;
+  text-align: right;
+}
+
+.main-body {
+  padding-top: 2em;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+} */
+
+.bouton {
+  text-align: right;
+  padding-right: 1em;
+}
+
+.optionrow {
+  padding-bottom: 1em;
+}
+
+input.pin {
+  margin-left: 0.5em;
+}
+
+.boutons {
+  text-align: right;
+}
+
+.row-boutons {
+  text-align: center;
+}
+
+.formLogin > div {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
+.pinInput {
+  width: 20em;
+}
+
+.alignement-droite {
+  text-align: right;
+}
+
+.code-qr {
+  padding: 1em;
+}
+
+div.table div.table-header {
+  background-color: #9eb1bb;
+  font-weight: bolder;
+}
+
+@media print {
+
+  .w3-top {
+    display: none;
+  }
+
+  .menu-gauche {
+    display: none;
+  }
+}
+
+.flex-wrapper {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.idmg {
+  font-size: smaller;
+}
+
+@media screen and (min-width: 768px) {
+  .editeur-body {
+    height: 40rem;
+    padding-bottom: 2rem;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .editeur-body {
+    height: 15rem;
+    padding-bottom: 2rem;
+  }
+}

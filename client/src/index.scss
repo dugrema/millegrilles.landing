@@ -1,0 +1,93 @@
+@use "sass:map";
+
+@import "@dugrema/millegrilles.reactjs/src/overrides.scss";
+@import "~bootstrap/scss/bootstrap";
+@import "@dugrema/millegrilles.reactjs/src/styles.scss";
+
+H2, H3 {
+    padding-top: 1rem;
+    padding-bottom: 0.25rem;
+}
+
+/* Page applications */
+.applications A {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
+    text-align: center;
+    background: $second-color;
+}
+
+.liste-boutons DIV, 
+.liste-boutons BUTTON {
+    margin-right: 0.25rem;
+    margin-bottom: 1rem;
+}
+.boutons.preauth {
+    margin-top: 3rem;
+}
+.boutons.preauth button {
+    margin-right: 1rem;
+    width: 7rem;
+}
+$xsmall-width: map.get($grid-breakpoints, xs);
+@media (min-width: $xsmall-width) {
+    div.boutons.preauth .bouton-gauche { text-align: center; }
+    div.boutons.preauth .bouton-droite { text-align: center; }  
+}
+
+.qr-code-background {
+    background: #fff;
+    padding: 0.3rem;
+}
+
+/* Cards */
+.card-senseur {
+    background-color: $second-color;
+}
+
+.vieux {
+    color: yellow;
+}
+
+.expire {
+    color: red;
+}
+
+.valeur-numerique {
+    text-align: right;
+}
+
+.bouton-fermer {
+    text-align: right;
+}
+
+.form-button-centrer {
+    text-align: center;
+}
+
+.form-button-centrer BUTTON {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+}
+
+.categorie-champ DIV {
+    margin-bottom: 1rem;
+}
+
+SPAN.ql-picker-label {
+    color: $fourth-color;
+}
+
+.ql-snow .ql-stroke, .ql-snow .ql-fill {
+    stroke: $fourth-color;
+}
+
+.champ-copiable {
+    cursor: pointer;
+}
+
+.copie {
+    color: green;
+    font-weight: 700;
+}

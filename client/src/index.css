@@ -1,0 +1,150 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+.bouton {
+  text-align: right;
+  padding-right: 1em;
+}
+
+.optionrow {
+  padding-bottom: 1em;
+}
+
+input.pin {
+  margin-left: 0.5em;
+}
+
+.boutons {
+  text-align: right;
+}
+
+.formLogin > div {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
+.pinInput {
+  width: 20em;
+}
+
+.alignement-droite {
+  text-align: right;
+}
+
+.code-qr {
+  padding: 1em;
+}
+
+/*div.table {}*/
+div.table div.table-header {
+  background-color: #9eb1bb;
+  font-weight: bolder;
+}
+
+@media print {
+
+  .w3-top {
+    display: none;
+  }
+
+  .menu-gauche {
+    display: none;
+  }
+}
+
+.flex-wrapper {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.footer {
+  width: 100%;
+  margin-top: 3em;
+  padding: 1em;
+  padding-bottom: 0.5em;
+  min-height: 4em;
+  color: White;
+}
+
+.footer H2 {
+  font-size: 1.25rem;
+  font-family: "Tahoma", sans-serif;
+}
+
+.footer div.row {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.footer A, .footer A:visited {
+  color: White;
+  text-decoration: underline;
+}
+
+.millegrille-footer {
+  padding-top: 4em;
+  text-align: center;
+  font-size: 0.75rem;
+  font-family: "Tahoma", sans-serif;
+}
+
+@media screen and (min-width: 768px) {
+  .millegrille-footer {
+    padding-top: 4em;
+  }
+
+  .footer-center {
+    text-align: center;
+  }
+
+  .footer-right {
+    text-align: right;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .millegrille-footer {
+    padding-top: 0.5em;
+  }
+
+  .footer-right {
+    text-align: center;
+    padding-top: 0.5em;
+  }
+}
+
+.idmg {
+  font-size: smaller;
+}
+
+i.protege {
+  color: green;
+}
