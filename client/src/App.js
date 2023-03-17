@@ -30,6 +30,8 @@ import './index.scss'
 import './App.css'
 
 const Accueil = lazy( () => import('./Accueil') )
+const ListeApplications = lazy( () => import('./ListeApplications') )
+const ConfigurerApplication = lazy( () => import('./ConfigurerApplication') )
 
 function App() {
   
@@ -174,8 +176,8 @@ function ApplicationLanding(props) {
 
   let Page = null
   switch(sectionAfficher) {
-    // case 'Categories': Page = Categories; break
-    // case 'Groupes': Page = Groupes; break
+    case 'ListeApplications': Page = ListeApplications; break
+    case 'ConfigurerApplication': Page = ConfigurerApplication; break
     default:
       Page = Accueil
   }
@@ -219,8 +221,8 @@ function MenuApp(props) {
 
   const handlerSelect = useCallback(eventKey => {
       switch(eventKey) {
-        // case 'groupes': setSectionAfficher('Groupes'); break
-        // case 'categories': setSectionAfficher('Categories'); break
+        case 'listeApplications': setSectionAfficher('ListeApplications'); break
+        case 'configurerApplication': setSectionAfficher('ConfigurerApplication'); break
         case 'portail': window.location = '/millegrilles'; break
         case 'deconnecter': deconnecterHandler(); break
         case 'information': setShowModalInfo(true); break
@@ -242,11 +244,11 @@ function MenuApp(props) {
       <>
           <MenuMillegrilles brand={brand} labelMenu="Menu" etatConnexion={etatConnexion} onSelect={handlerSelect}>
 
-            {/* <Nav.Link eventKey="groupes" title={t('menu.groupes')}>
-                {t('menu.groupes')}
+            <Nav.Link eventKey="listeApplications" title={t('menu.listeApplications')}>
+                {t('menu.listeApplications')}
             </Nav.Link>
 
-            <Nav.Link eventKey="categories" title={t('menu.categories')}>
+            {/* <Nav.Link eventKey="categories" title={t('menu.categories')}>
                 {t('menu.categories')}
             </Nav.Link> */}
 

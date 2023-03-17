@@ -4,6 +4,7 @@
         "nom": "Landing"
     },
     "menu": {
+        "listeApplications": "Applications",
         "information": "Information",
         "language": "Language",
         "portail": "Portail",

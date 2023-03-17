@@ -12,7 +12,8 @@ export function configurerEvenements(socket) {
     listenersPrives: [
     ],
     listenersProteges: [
-      // {eventName: 'getAppareilsUsager', callback: (params, cb) => traiter(socket, mqdao.getAppareilsUsager, {params, cb}) },
+      {eventName: 'getListeApplications', callback: (params, cb) => traiter(socket, mqdao.getListeApplications, {params, cb}) },
+      {eventName: 'creerNouvelleApplication', callback: (params, cb) => traiter(socket, mqdao.creerNouvelleApplication, {params, cb}) },
 
       // Listeners
       // {eventName: 'ecouterEvenementsCategoriesUsager', callback: (_, cb) => {mqdao.ecouterEvenementsCategoriesUsager(socket, cb)}},

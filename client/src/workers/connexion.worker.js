@@ -3,30 +3,30 @@ import * as ConnexionClient from '@dugrema/millegrilles.reactjs/src/connexionCli
 
 const CONST_DOMAINE_LANDING = 'Landing'
 
-// function getCategoriesUsager(requete) {
-//   requete = requete || {}
-//   return ConnexionClient.emitBlocking(
-//     'getCategoriesUsager', 
-//     requete, 
-//     {
-//       domaine: CONST_DOMAINE_DOCUMENTS, 
-//       action: 'getCategoriesUsager', 
-//       ajouterCertificat: true,
-//     }
-//   )
-// }
+function getListeApplications(requete) {
+  requete = requete || {}
+  return ConnexionClient.emitBlocking(
+    'getListeApplications', 
+    requete, 
+    {
+      domaine: CONST_DOMAINE_LANDING, 
+      action: 'getListeApplications', 
+      ajouterCertificat: true,
+    }
+  )
+}
 
-// function sauvegarderCategorieUsager(categorie) {
-//   return ConnexionClient.emitBlocking(
-//     'sauvegarderCategorieUsager', 
-//     categorie, 
-//     {
-//       domaine: CONST_DOMAINE_DOCUMENTS, 
-//       action: 'sauvegarderCategorieUsager', 
-//       ajouterCertificat: true,
-//     }
-//   )
-// }
+function creerNouvelleApplication() {
+  return ConnexionClient.emitBlocking(
+    'creerNouvelleApplication', 
+    {}, 
+    {
+      domaine: CONST_DOMAINE_LANDING, 
+      action: 'creerNouvelleApplication', 
+      ajouterCertificat: true,
+    }
+  )
+}
 
 // Evenements
 
@@ -43,6 +43,7 @@ expose({
     ...ConnexionClient, 
 
     // Requetes et commandes privees
+    getListeApplications, creerNouvelleApplication,
 
     // Event listeners proteges
     

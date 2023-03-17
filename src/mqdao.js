@@ -16,13 +16,13 @@ export function challenge(socket, params) {
     return socket.amqpdao.pki.formatterMessage(reponse, 'challenge', {ajouterCertificat: true})
 }
 
-// export function getCategoriesUsager(socket, params) {
-//     return transmettreRequete(socket, params, 'getCategoriesUsager')
-// }
+export function getListeApplications(socket, params) {
+    return transmettreRequete(socket, params, 'getListeApplications')
+}
 
-// export function sauvegarderCategorieUsager(socket, params) {
-//     return transmettreCommande(socket, params, 'sauvegarderCategorieUsager')
-// }
+export function creerNouvelleApplication(socket, params) {
+    return transmettreCommande(socket, params, 'creerNouvelleApplication')
+}
 
 async function transmettreRequete(socket, params, action, opts) {
     opts = opts || {}

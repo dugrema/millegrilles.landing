@@ -6,7 +6,7 @@ function Accueil(props) {
 
     return (
         <div>
-            FIX ME...
+            Page d'accueil ...  todo
             {/* <Landing /> */}
         </div>
     )
