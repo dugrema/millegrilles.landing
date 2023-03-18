@@ -98,6 +98,7 @@ function FormApplication(props) {
     console.debug("Submit %O, certificats %O", contenu, certificats)
     submitForm(urlConnexion, workers, contenu, token, certificats)
       .then(r=>{
+        console.debug("Reponse submit ", r)
         resetToken()
       })
       .catch(err=>console.error("Erreur submit form ", err))
@@ -151,10 +152,11 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   const url = new URL(urlConnexion)
   url.pathname = url.pathname + '/public/submit'
 
-  await axiosImport.default({
+  const reponse = await axiosImport.default({
     method: 'POST',
     url: url.href,
     data: {message: messageChiffre, token},
   })
 
+  return reponse.data
 }
