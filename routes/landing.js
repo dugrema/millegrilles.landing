@@ -67,6 +67,7 @@ function routesPubliques() {
 
   router.use(protectionPublique)
   router.get('/token', getToken)
+  router.post('/submit', express.json(), submitForm)
 
   return router
 }
@@ -110,4 +111,11 @@ function verifierAuthentificationPrivee(req, res, next) {
   } catch(err) {
       console.error("apps.verifierAuthentification Erreur : %O", err)
   }
+}
+
+async function submitForm(req, res, next) {
+  const body = req.body
+  debug("Submit form req :\n", body)
+
+  return res.sendStatus(201)
 }

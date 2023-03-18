@@ -9,6 +9,7 @@ import Alert from 'react-bootstrap/Alert'
 
 import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
+import { chiffrerMessage } from './messageUtils'
 
 // Importer JS global
 import 'react-bootstrap/dist/react-bootstrap.min.js'
@@ -43,6 +44,8 @@ function LayoutMain(props) {
 
   const [token, setToken] = useState('')
 
+  const resetTokenHandler = useCallback(()=>setToken(''), [setToken])
+
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
     getToken(urlConnexion, config.application_id)
@@ -63,7 +66,11 @@ function LayoutMain(props) {
           <div style={{'fontSize': 'x-small'}}>{token.replaceAll('\.', '\. ')}</div>
         </div>
       </Alert>
-      <FormApplication />
+
+      <FormApplication 
+        token={token}
+        resetToken={resetTokenHandler} />
+
     </Container>
   )
 }
@@ -74,6 +81,11 @@ function Attente(props) {
 
 function FormApplication(props) {
 
+  const { token, resetToken } = props
+
+  const workers = useWorkers(),
+        urlConnexion = useUrlConnexion()
+
   const [champ1, setChamp1] = useState('')
 
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
@@ -82,9 +94,14 @@ function FormApplication(props) {
     const contenu = {
       champ1
     }
-    console.debug("Submit ", contenu)
-
-  }, [champ1])
+    const certificats = workers.config.getClesChiffrage()
+    console.debug("Submit %O, certificats %O", contenu, certificats)
+    submitForm(urlConnexion, workers, contenu, token, certificats)
+      .then(r=>{
+        resetToken()
+      })
+      .catch(err=>console.error("Erreur submit form ", err))
+  }, [urlConnexion, workers, champ1, token, resetToken])
 
   return (
     <div>
@@ -120,4 +137,33 @@ async function getToken(urlConnexion, application_id) {
     console.debug("Reponse token ", data)
     const token = data.token
     return token
+}
+
+async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem) {
+
+  const from = 'Landing'
+  const opts = {}
+  const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenu, opts)
+  console.debug("Message chiffre : ", messageChiffre)
+
+  const axiosImport = await import('axios')
+
+  const url = new URL(urlConnexion)
+  url.pathname = url.pathname + '/public/submit'
+
+  axiosImport.default({
+    method: 'POST',
+    url: url.href,
+    data: {message: messageChiffre, token},
+  })
+
+  const reponse = {}
+  console.debug("Reponse ", reponse)
+
+  if(reponse.ok === true) {
+    return true
+  } else {
+    throw new Error(`Erreur sauvegarde form : ${reponse.err}`)
+  }
+
 }
