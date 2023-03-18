@@ -137,6 +137,8 @@ function ApplicationLanding(props) {
   const etatPret = useEtatPret()
   const usager = useUsager()
 
+  const [applicationId, setApplicationId] = useState('')
+
   // const categoriesMajHandler = useCallback(comlinkProxy(message => {
   //   dispatch(categoriesMergeItems(message.message))
   // }), [dispatch])
@@ -175,16 +177,22 @@ function ApplicationLanding(props) {
   // }, [workers, dispatch, etatPret, usager, categoriesMajHandler, groupesMajHandler])
 
   let Page = null
-  switch(sectionAfficher) {
-    case 'ListeApplications': Page = ListeApplications; break
-    case 'ConfigurerApplication': Page = ConfigurerApplication; break
-    default:
-      Page = Accueil
+  if(applicationId) {
+    Page = ConfigurerApplication
+  } else {
+    switch(sectionAfficher) {
+      case 'ListeApplications': Page = ListeApplications; break
+      default:
+        Page = Accueil
+    }
   }
 
   return (
     <Container className="main-body">
-      <Page setSectionAfficher={setSectionAfficher} />
+      <Page 
+        setSectionAfficher={setSectionAfficher} 
+        applicationId={applicationId}
+        setApplicationId={setApplicationId} />
     </Container>
   )
 

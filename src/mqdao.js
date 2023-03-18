@@ -20,8 +20,16 @@ export function getListeApplications(socket, params) {
     return transmettreRequete(socket, params, 'getListeApplications')
 }
 
+export function getApplication(socket, params) {
+    return transmettreRequete(socket, params, 'getApplication')
+}
+
 export function creerNouvelleApplication(socket, params) {
     return transmettreCommande(socket, params, 'creerNouvelleApplication')
+}
+
+export function sauvegarderApplication(socket, params) {
+    return transmettreCommande(socket, params, 'sauvegarderApplication')
 }
 
 async function transmettreRequete(socket, params, action, opts) {

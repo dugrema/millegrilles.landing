@@ -13,7 +13,9 @@ export function configurerEvenements(socket) {
     ],
     listenersProteges: [
       {eventName: 'getListeApplications', callback: (params, cb) => traiter(socket, mqdao.getListeApplications, {params, cb}) },
+      {eventName: 'getApplication', callback: (params, cb) => traiter(socket, mqdao.getApplication, {params, cb}) },
       {eventName: 'creerNouvelleApplication', callback: (params, cb) => traiter(socket, mqdao.creerNouvelleApplication, {params, cb}) },
+      {eventName: 'sauvegarderApplication', callback: (params, cb) => traiter(socket, mqdao.sauvegarderApplication, {params, cb}) },
 
       // Listeners
       // {eventName: 'ecouterEvenementsCategoriesUsager', callback: (_, cb) => {mqdao.ecouterEvenementsCategoriesUsager(socket, cb)}},

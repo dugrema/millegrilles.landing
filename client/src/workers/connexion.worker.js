@@ -16,6 +16,18 @@ function getListeApplications(requete) {
   )
 }
 
+function getApplication(applicationId) {
+  return ConnexionClient.emitBlocking(
+    'getApplication', 
+    {application_id: applicationId}, 
+    {
+      domaine: CONST_DOMAINE_LANDING, 
+      action: 'getApplication', 
+      ajouterCertificat: true,
+    }
+  )
+}
+
 function creerNouvelleApplication() {
   return ConnexionClient.emitBlocking(
     'creerNouvelleApplication', 
@@ -23,6 +35,18 @@ function creerNouvelleApplication() {
     {
       domaine: CONST_DOMAINE_LANDING, 
       action: 'creerNouvelleApplication', 
+      ajouterCertificat: true,
+    }
+  )
+}
+
+function sauvegarderApplication(application) {
+  return ConnexionClient.emitBlocking(
+    'sauvegarderApplication', 
+    application, 
+    {
+      domaine: CONST_DOMAINE_LANDING, 
+      action: 'sauvegarderApplication', 
       ajouterCertificat: true,
     }
   )
@@ -43,7 +67,8 @@ expose({
     ...ConnexionClient, 
 
     // Requetes et commandes privees
-    getListeApplications, creerNouvelleApplication,
+    getListeApplications, getApplication, 
+    creerNouvelleApplication, sauvegarderApplication,
 
     // Event listeners proteges
     
