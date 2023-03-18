@@ -14,10 +14,16 @@ const { extraireExtensionsMillegrille } = forgecommon
 export default async function app(params) {
     debug("Server app params %O", params)
     const app = express()
+    app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal'])
     const {server, socketIo, amqpdao: amqpdaoInst} = await server6(
         app,
         configurerEvenements,
-        {pathApp: '/landing', verifierAutorisation, exchange: '2.prive'}
+        {
+          pathApp: '/landing', 
+          verifierAuthentification: (req, res, next) => next(),  // Bypass, gerer par route
+          verifierAutorisation, 
+          exchange: '2.prive'
+        }
     )
 
     socketIo.use((socket, next)=>{
@@ -54,4 +60,3 @@ function verifierAutorisation(socket, securite, certificatForge) {
    
     return {prive, protege}
 }
-
