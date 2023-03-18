@@ -113,9 +113,23 @@ function verifierAuthentificationPrivee(req, res, next) {
   }
 }
 
-async function submitForm(req, res, next) {
+async function submitForm(req, res) {
   const body = req.body
   debug("Submit form req :\n", body)
+
+  // Verifier le token JWT
+  const { token, message } = body
+
+  if(!message) return res.status(400).send({ok: false, err: 'Message missing'})
+  if(!token) return res.status(403).send({ok: false, err: 'Token missing'})
+
+  const tokenInfo = await verifierTokenApplication(req.amqpdao.pki, token)
+  debug("Token Info : ", tokenInfo)
+  const { extensions, payload } = tokenInfo
+  if( ! extensions.roles.includes('landing_web') ) return res.status(403).send({ok: false, err: 'Invalid cert role'})
+
+  const { application_id, sub: uuid_transaction} = payload
+  debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
 
   return res.sendStatus(201)
 }

@@ -151,19 +151,10 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   const url = new URL(urlConnexion)
   url.pathname = url.pathname + '/public/submit'
 
-  axiosImport.default({
+  await axiosImport.default({
     method: 'POST',
     url: url.href,
     data: {message: messageChiffre, token},
   })
-
-  const reponse = {}
-  console.debug("Reponse ", reponse)
-
-  if(reponse.ok === true) {
-    return true
-  } else {
-    throw new Error(`Erreur sauvegarde form : ${reponse.err}`)
-  }
 
 }
