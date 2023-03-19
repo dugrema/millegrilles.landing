@@ -5,7 +5,7 @@ export async function chiffrerMessage(workers, certifcatsChiffragePem, from, con
 
     // const {connexion, chiffrage} = workers
     const { chiffrage } = workers
-    const champsOptionnels = ['subject', ]
+    const champsOptionnels = ['subject', 'to', ]
 
     // const toFiltre = to.split(';').map(item=>item.trim())
     // let ccFiltre = []
@@ -87,12 +87,14 @@ export async function chiffrerMessage(workers, certifcatsChiffragePem, from, con
 
     // Chiffrer le message 
     const messageChiffre = await chiffrage.chiffrerDocument(
-        messageBytes, 'Landing', certifcatsChiffragePem, 
+        messageBytes, 'Messagerie', certifcatsChiffragePem, 
         {DEBUG: true, identificateurs_document: {'landing': 'true'}, nojson: true, type: 'binary'}
     )
-    // console.debug("Message chiffre : %O", messageChiffre)
+    console.debug("Message chiffre : %O", messageChiffre)
 
     const commandeMaitrecles = messageChiffre.commandeMaitrecles
+    commandeMaitrecles.partition = commandeMaitrecles['_partition']
+    delete commandeMaitrecles['_partition']
 
     // const destinataires = [...new Set([...toFiltre, ...ccFiltre, ...bccFiltre])]  // dedupe
 

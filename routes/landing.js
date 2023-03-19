@@ -114,6 +114,7 @@ function verifierAuthentificationPrivee(req, res, next) {
 }
 
 async function submitForm(req, res) {
+  const mq = req.amqpdao
   const body = req.body
   debug("Submit form req :\n", body)
 
@@ -128,7 +129,7 @@ async function submitForm(req, res) {
 
   try {
     try {
-      var tokenInfo = await verifierTokenApplication(req.amqpdao.pki, token)
+      var tokenInfo = await verifierTokenApplication(mq.pki, token)
     } catch(err) {
       return res.status(403).send({ok: false, err: "Invalid token"})
     }
@@ -138,6 +139,44 @@ async function submitForm(req, res) {
 
     const { application_id, sub: uuid_transaction} = payload
     debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
+
+    // Charger configuration application
+    const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
+    debug("Info application ", infoApplication)
+    const { user_id, actif } = infoApplication
+    if(actif !== true) return res.status(503).send({ok: false, err: 'Application inactive'})
+
+    // Signer message
+    const { commandeMaitrecles, enveloppeMessage } = message
+    const messageMessagerie = {
+      ...enveloppeMessage,
+      application_id, 
+      fingerprint_certificat: mq.pki.fingerprint,
+    }
+    const messageSigne = await mq.pki.formatterMessage(
+      messageMessagerie, 'Landing', 
+      {uuidTransaction: uuid_transaction, ajouterCertificat: true}
+    )
+    debug("Message signe : ", messageSigne)
+
+    const commandeMaitreclesSignee = await mq.pki.formatterMessage(
+      commandeMaitrecles, 'MaitreDesCles', 
+      {action: 'sauvegarderCle', ajouterCertificat: true}
+    )
+
+    // Generer transaction de messagerie
+    const transaction = {
+      message: messageSigne,
+      destinataires: [],  // Aucune adresse destinataire
+      destinataires_user_id: [{user_id}],  // User IDs internes
+      application_id,
+      _cle: commandeMaitreclesSignee,
+    }
+
+    console.debug("Transaction ", transaction)
+
+    const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
+    debug("Reponse recevoir : ", reponse)
 
     return res.status(201).send({ok: true, uuid_transaction})
   } catch(err) {

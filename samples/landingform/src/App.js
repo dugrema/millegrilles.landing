@@ -91,9 +91,12 @@ function FormApplication(props) {
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
 
   const submitHandler = useCallback(()=>{
-    const contenu = {
-      champ1
-    }
+    const contenu = `
+    <h2>Application Sample Form</h2>
+    <p>---</p>
+    <p>Champ 1 : ${champ1}</p>
+    <p>---</p>
+    `
     const certificats = workers.config.getClesChiffrage()
     console.debug("Submit %O, certificats %O", contenu, certificats)
     submitForm(urlConnexion, workers, contenu, token, certificats)
@@ -142,8 +145,8 @@ async function getToken(urlConnexion, application_id) {
 
 async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem) {
 
-  const from = 'Landing'
-  const opts = {}
+  const from = 'Landing - Sample Form'
+  const opts = { /*to: ['Sample Form Handler']*/ }
   const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenu, opts)
   console.debug("Message chiffre : ", messageChiffre)
 
