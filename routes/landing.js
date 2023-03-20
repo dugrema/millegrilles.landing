@@ -1,8 +1,8 @@
 import debugLib from 'debug'
 import express from 'express'
-import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
-import { v4 as uuidv4 } from 'uuid'
-const debug = debugLib('landing:route');
+import routesPubliques from './public.js'
+import protectionPublique from './protectionpublique.js'
+const debug = debugLib('landing:route')
 
 function initialiser(amqpdao, opts) {
   if(!opts) opts = {}
@@ -14,6 +14,7 @@ function initialiser(amqpdao, opts) {
 
   // Section publique (aucune authentification, juste tokens JWT)
   route.use('/public', routesPubliques())
+  route.get('/protectionpublique', protectionPublique)
 
   // Section privee
   route.use(verifierAuthentificationPrivee)
@@ -26,10 +27,25 @@ function initialiser(amqpdao, opts) {
 
   // Retourner dictionnaire avec route pour server.js
   return route
-
 }
 
 export default initialiser
+
+function verifierAuthentificationPrivee(req, res, next) {
+  try {
+      const session = req.session
+      if( ! (session.nomUsager && session.userId) ) {
+          debug("Nom usager/userId ne sont pas inclus dans les req.headers : %O", req.headers)
+          res.append('Access-Control-Allow-Origin', '*')  // S'assurer que le message est recu cross-origin
+          res.sendStatus(403)
+          return
+      } else {
+          return next()
+      }
+  } catch(err) {
+      console.error("apps.verifierAuthentification Erreur : %O", err)
+  }
+}
 
 function initSession(req, res) {
   return res.sendStatus(200)
@@ -57,131 +73,3 @@ function routeInfo(req, res, next) {
   return res.send(reponse)
 }
 
-// Routes publiques
-function routesPubliques() {
-  const router = express.Router()
-
-  // router.use((req)=>{
-  //   req.ip
-  // })
-
-  router.use(protectionPublique)
-  router.get('/token', getToken)
-  router.post('/submit', express.json(), submitForm)
-
-  return router
-}
-
-/** Compteur par adresse IP source pour eviter attaques */
-function protectionPublique(req, res, next) {
-
-  const publicIp = req.ip
-  debug("protectionPublique ip : %s", publicIp)
-  // TODO : ajouter IP a redis, verifier si compte est depasse (voir messagerie upload)  
-
-  next()
-}
-
-async function getToken(req, res) {
-  const queryParams = req.query
-  const application_id = queryParams.application_id
-
-  if(!application_id) return res.sendStatus(400)  // Manque application_id
-
-  const opts = {expiration: '2h'}
-  const uuid_transaction = ''+uuidv4()
-  const { cle: clePriveePem, fingerprint } = req.amqpdao.pki
-  const token = await signerTokenApplication(fingerprint, clePriveePem, application_id, uuid_transaction, opts)
-
-  return res.status(200).send({uuid_transaction, token})
-}
-
-
-function verifierAuthentificationPrivee(req, res, next) {
-  try {
-      const session = req.session
-      if( ! (session.nomUsager && session.userId) ) {
-          debug("Nom usager/userId ne sont pas inclus dans les req.headers : %O", req.headers)
-          res.append('Access-Control-Allow-Origin', '*')  // S'assurer que le message est recu cross-origin
-          res.sendStatus(403)
-          return
-      } else {
-          return next()
-      }
-  } catch(err) {
-      console.error("apps.verifierAuthentification Erreur : %O", err)
-  }
-}
-
-async function submitForm(req, res) {
-  const mq = req.amqpdao
-  const body = req.body
-  debug("Submit form req :\n", body)
-
-  // S'assurer que le message est recu cross-origin
-  // res.append('Access-Control-Allow-Origin', '*')
-
-  // Verifier le token JWT
-  const { token, message } = body
-
-  if(!message) return res.status(400).send({ok: false, err: 'Message missing'})
-  if(!token) return res.status(401).send({ok: false, err: 'Token missing'})
-
-  try {
-    try {
-      var tokenInfo = await verifierTokenApplication(mq.pki, token)
-    } catch(err) {
-      return res.status(403).send({ok: false, err: "Invalid token"})
-    }
-    debug("Token Info : ", tokenInfo)
-    const { extensions, payload } = tokenInfo
-    if( ! extensions.roles.includes('landing_web') ) return res.status(403).send({ok: false, err: 'Invalid cert role'})
-
-    const { application_id, sub: uuid_transaction} = payload
-    debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
-
-    // Charger configuration application
-    const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
-    debug("Info application ", infoApplication)
-    const { user_id, actif } = infoApplication
-    if(actif !== true) return res.status(503).send({ok: false, err: 'Application inactive'})
-
-    // Signer message
-    const { commandeMaitrecles, enveloppeMessage } = message
-    const messageMessagerie = {
-      ...enveloppeMessage,
-      application_id, 
-      fingerprint_certificat: mq.pki.fingerprint,
-    }
-    const messageSigne = await mq.pki.formatterMessage(
-      messageMessagerie, 'Landing', 
-      {uuidTransaction: uuid_transaction, ajouterCertificat: true}
-    )
-    debug("Message signe : ", messageSigne)
-
-    const commandeMaitreclesSignee = await mq.pki.formatterMessage(
-      commandeMaitrecles, 'MaitreDesCles', 
-      {action: 'sauvegarderCle', ajouterCertificat: true}
-    )
-
-    // Generer transaction de messagerie
-    const transaction = {
-      message: messageSigne,
-      destinataires: [],  // Aucune adresse destinataire
-      destinataires_user_id: [{user_id}],  // User IDs internes
-      application_id,
-      _cle: commandeMaitreclesSignee,
-    }
-
-    console.debug("Transaction ", transaction)
-
-    const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
-    debug("Reponse recevoir : ", reponse)
-
-    return res.status(201).send({ok: true, uuid_transaction})
-  } catch(err) {
-    console.error(new Date() + ' ERROR submitForm ', err)
-    return res.sendStatus(500)
-  }
-
-}
