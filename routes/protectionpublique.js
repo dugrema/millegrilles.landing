@@ -22,7 +22,7 @@ async function protectionPublique(req, res) {
 
     const limiteDepassee = await appliquerRateLimit(req, typerate, {limite: hitrate})
     if(limiteDepassee) {
-        res.setHeader('Retry-After', EXPIRATION_RATE_REDIS)
+        res.setHeader('Retry-After', limiteDepassee)
         return res.status(429).send()
     }
 
@@ -49,7 +49,8 @@ async function appliquerRateLimit(req, typeRate, opts) {
             const quotaMaj = '' + (quotaInt-1)
             redisClient.set(cleRedis, quotaMaj, {KEEPTTL: true})
         } else {
-            return true  // Limite atteinte
+            const ttl = await redisClient.ttl(cleRedis)
+            return ttl + 1  // Limite atteinte
         }
     } else {
         // Entree initiale pour la periode TTL
