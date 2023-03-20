@@ -84,7 +84,8 @@ function FormApplication(props) {
   const { token, resetToken } = props
 
   const workers = useWorkers(),
-        urlConnexion = useUrlConnexion()
+        urlConnexion = useUrlConnexion(),
+        config = useConfig()
 
   const [champ1, setChamp1] = useState('')
 
@@ -99,13 +100,13 @@ function FormApplication(props) {
     `
     const certificats = workers.config.getClesChiffrage()
     console.debug("Submit %O, certificats %O", contenu, certificats)
-    submitForm(urlConnexion, workers, contenu, token, certificats)
+    submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id})
       .then(r=>{
         console.debug("Reponse submit ", r)
         resetToken()
       })
       .catch(err=>console.error("Erreur submit form ", err))
-  }, [urlConnexion, workers, champ1, token, resetToken])
+  }, [urlConnexion, workers, config, champ1, token, resetToken])
 
   return (
     <div>
@@ -143,11 +144,26 @@ async function getToken(urlConnexion, application_id) {
     return token
 }
 
-async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem) {
+async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
+  opts = opts || {}
+  const application_id = opts.application_id
 
-  const from = 'Landing - Sample Form'
-  const opts = { /*to: ['Sample Form Handler']*/ }
-  const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenu, opts)
+  const from = 'Landing page'
+  const subject = 'Sample Form ' + new Date()
+  const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
+
+  const headerContenu = `
+  <p>--- HEADER ---</p>
+  <div class='header'>
+    <p>Application Id : ${application_id}</p>
+    <p>Date client : ${''+new Date()}</p>
+  </div>
+  <p>--- FIN HEADER ---</p>
+  <p> </p>
+  `
+  const contenuAvecHeader = headerContenu + contenu
+
+  const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenuAvecHeader, optionsMessage)
   console.debug("Message chiffre : ", messageChiffre)
 
   const axiosImport = await import('axios')

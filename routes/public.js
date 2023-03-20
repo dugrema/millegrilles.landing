@@ -8,26 +8,13 @@ const debug = debugLib('landing:public')
 // Routes publiques
 function routesPubliques() {
     const router = express.Router()
- 
-    //router.use(protectionPublique)
     router.get('/token', getToken)
     router.post('/submit', express.json(), verifierToken, submitForm)
-  
     return router
 }
 
 export default routesPubliques
   
-// /** Compteur par adresse IP source pour eviter attaques */
-// function protectionPublique(req, res, next) {
-  
-//     const publicIp = req.ip
-//     debug("protectionPublique ip : %s", publicIp)
-//     // TODO : ajouter IP a redis, verifier si compte est depasse (voir messagerie upload)  
-  
-//     next()
-// }
-
 async function getToken(req, res) {
     const queryParams = req.query
     const application_id = queryParams.application_id
@@ -60,10 +47,7 @@ async function submitForm(req, res) {
     const mq = req.amqpdao
     const body = req.body
     debug("Submit form req :\n", body)
-  
-    // S'assurer que le message est recu cross-origin
-    // res.append('Access-Control-Allow-Origin', '*')
-  
+
     // Verifier le token JWT
     const { message } = body
   
@@ -84,38 +68,14 @@ async function submitForm(req, res) {
       // Charger configuration application
       const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
       debug("Info application ", infoApplication)
-      const { user_id, actif } = infoApplication
+      const { actif } = infoApplication
       if(actif !== true) return res.status(503).send({ok: false, err: 'Application inactive'})
-  
-      // Signer message
-      const { commandeMaitrecles, enveloppeMessage } = message
-      const messageMessagerie = {
-        ...enveloppeMessage,
-        application_id, 
-        fingerprint_certificat: mq.pki.fingerprint,
-      }
-      const messageSigne = await mq.pki.formatterMessage(
-        messageMessagerie, 'Landing', 
-        {uuidTransaction: uuid_transaction, ajouterCertificat: true}
-      )
-      debug("Message signe : ", messageSigne)
-  
-      const commandeMaitreclesSignee = await mq.pki.formatterMessage(
-        commandeMaitrecles, 'MaitreDesCles', 
-        {action: 'sauvegarderCle', ajouterCertificat: true}
-      )
-  
-      // Generer transaction de messagerie
-      const transaction = {
-        message: messageSigne,
-        destinataires: [],  // Aucune adresse destinataire
-        destinataires_user_id: [{user_id}],  // User IDs internes
-        application_id,
-        _cle: commandeMaitreclesSignee,
-      }
-  
+
+      // Creer transaction
+      const transaction = await formatterTransactionMessagerie(mq, infoApplication, uuid_transaction, message)
       console.debug("Transaction ", transaction)
-  
+
+      // Soumettre la transaction
       const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
       debug("Reponse recevoir : ", reponse)
   
@@ -126,4 +86,38 @@ async function submitForm(req, res) {
     }
   
 }
-  
+
+async function formatterTransactionMessagerie(mq, infoApplication, uuid_transaction, message) {
+  const { application_id, user_id } = infoApplication
+
+  debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
+
+  // Signer message
+  const { commandeMaitrecles, enveloppeMessage } = message
+  const messageMessagerie = {
+    ...enveloppeMessage,
+    application_id, 
+    fingerprint_certificat: mq.pki.fingerprint,
+  }
+  const messageSigne = await mq.pki.formatterMessage(
+    messageMessagerie, 'Landing', 
+    {uuidTransaction: uuid_transaction, ajouterCertificat: true}
+  )
+  debug("Message signe : ", messageSigne)
+
+  const commandeMaitreclesSignee = await mq.pki.formatterMessage(
+    commandeMaitrecles, 'MaitreDesCles', 
+    {action: 'sauvegarderCle', ajouterCertificat: true}
+  )
+
+  // Generer transaction de messagerie
+  const transaction = {
+    message: messageSigne,
+    destinataires: [],  // Aucune adresse destinataire
+    destinataires_user_id: [{user_id}],  // User IDs internes
+    application_id,
+    _cle: commandeMaitreclesSignee,
+  }
+
+  return transaction
+}
