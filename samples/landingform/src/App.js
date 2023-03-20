@@ -91,7 +91,10 @@ function FormApplication(props) {
 
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
 
-  const submitHandler = useCallback(()=>{
+  const submitHandler = useCallback( e => {
+    e.preventDefault()
+    e.stopPropagation()
+
     const contenu = `
     <h2>Application Sample Form</h2>
     <p>---</p>

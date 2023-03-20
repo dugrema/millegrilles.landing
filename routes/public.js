@@ -42,9 +42,10 @@ export async function verifierToken(req, res, next) {
         return res.sendStatus(401)
     }
 }
-  
+
 async function submitForm(req, res) {
     const mq = req.amqpdao
+    const redisClient = req.redisClient  //amqpdaoInst.pki.redisClient
     const body = req.body
     debug("Submit form req :\n", body)
 
@@ -62,9 +63,14 @@ async function submitForm(req, res) {
       const { extensions, payload } = tokenInfo
       if( ! extensions.roles.includes('landing_web') ) return res.status(403).send({ok: false, err: 'Invalid cert role'})
   
-      const { application_id, sub: uuid_transaction} = payload
+      const { application_id, sub: uuid_transaction, exp: expirationToken } = payload
       debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
   
+      // S'assurer que le token n'a pas deja ete utilise avec redis
+      const cleRedisSubmit = `landing:submit:${uuid_transaction}`
+      const tokenDejaUtilise = await redisClient.get(cleRedisSubmit)
+      if(tokenDejaUtilise) return res.status(400).send({ok: false, err: 'Token deja utilise'})
+
       // Charger configuration application
       const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
       debug("Info application ", infoApplication)
@@ -78,6 +84,11 @@ async function submitForm(req, res) {
       // Soumettre la transaction
       const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
       debug("Reponse recevoir : ", reponse)
+
+      // Ajouter cle dans redis pour bloquer reutilisation du token
+      const ttl = expirationToken - Math.round(new Date().getTime()/1000) + 1
+      redisClient.set(cleRedisSubmit, '1', {NX: true, EX: ttl})
+        .catch(err=>console.error(new Date() + " ERROR submitForm Erreur sauvegarde cle redis submit " + cleRedisSubmit + " : " + err))
   
       return res.status(201).send({ok: true, uuid_transaction})
     } catch(err) {
