@@ -1,0 +1,78 @@
+.bouton {
+  text-align: right;
+  padding-right: 1em;
+}
+
+.optionrow {
+  padding-bottom: 1em;
+}
+
+input.pin {
+  margin-left: 0.5em;
+}
+
+.boutons {
+  text-align: right;
+}
+
+.row-boutons {
+  text-align: center;
+}
+
+.formLogin > div {
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+
+.pinInput {
+  width: 20em;
+}
+
+.alignement-droite {
+  text-align: right;
+}
+
+.code-qr {
+  padding: 1em;
+}
+
+div.table div.table-header {
+  background-color: #9eb1bb;
+  font-weight: bolder;
+}
+
+@media print {
+
+  .w3-top {
+    display: none;
+  }
+
+  .menu-gauche {
+    display: none;
+  }
+}
+
+.flex-wrapper {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.idmg {
+  font-size: smaller;
+}
+
+@media screen and (min-width: 768px) {
+  .editeur-body {
+    height: 40rem;
+    padding-bottom: 2rem;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .editeur-body {
+    height: 15rem;
+    padding-bottom: 2rem;
+  }
+}
