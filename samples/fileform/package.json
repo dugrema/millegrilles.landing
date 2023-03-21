@@ -17,7 +17,9 @@
   },
   "peerDependencies": {
     "@dugrema/millegrilles.utiljs": "github:dugrema/millegrilles.utiljs#2023.3",
-    "bootstrap": "^5.1"
+    "bootstrap": "^5.1",
+    "@reduxjs/toolkit": "^1.8",
+    "react-redux": "^8.0"
   },
   "scripts": {
     "start": "react-app-rewired start",

@@ -1,6 +1,7 @@
 import { wrap, releaseProxy } from 'comlink'
 
-const FICHE_URL = 'https://mg-dev1.maple.maceroc.com/fiche.json'
+import * as uploadFichiersDao from '../redux/uploaderIdbDao'
+import setupTraitementFichiers from './traitementFichiers'
 
 class ConfigDao {
   constructor(chiffrage) {
@@ -55,18 +56,22 @@ export function setupWorkers() {
 
   // Chiffrage et x509 sont combines, reduit taille de l'application
   const chiffrage = wrapWorker(new Worker(new URL('./chiffrage.worker', import.meta.url), {type: 'module'}))
+  const transfertFichiers = wrapWorker(new Worker(new URL('./transfert.worker', import.meta.url), {type: 'module'}))
 
   // Pseudo worker
   const configDao = new ConfigDao(chiffrage)
 
-  const workerInstances = { chiffrage }
+  const workerInstances = { chiffrage, transfertFichiers }
 
   const workers = Object.keys(workerInstances).reduce((acc, item)=>{
     acc[item] = workerInstances[item].proxy
     return acc
   }, {})
 
+  // Pseudo-worker
   workers.config = configDao
+  workers.uploadFichiersDao = uploadFichiersDao      // IDB upload fichiers
+  workers.traitementFichiers = setupTraitementFichiers(workers) // Upload et download
 
   const configPromise = loadConfiguration()
     .then(async config=>{
@@ -76,7 +81,8 @@ export function setupWorkers() {
       if(ca) {
         await chiffrage.proxy.init(ca)  // x509client
         await chiffrage.proxy.initialiserCertificateStore(ca, {isPEM: true, DEBUG: false})  // chiffrage
-        
+        // await transfertFichiers.proxy.up_setCertificatCa(ca)  //  Note : pas necessaire, cles secrets chiffrages via contenu message
+
         // Valider message
         const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
         if(config.idmg && config.idmg != idmgCalcule) throw new Error("IDMG mismatch")

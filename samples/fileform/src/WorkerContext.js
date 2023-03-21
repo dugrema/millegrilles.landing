@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useMemo, useEffect } from 'react'
+import { Provider as ReduxProvider } from 'react-redux'
+
 import { setupWorkers } from './workers/workerLoader'
+import storeSetup from './redux/store'
 
 const Context = createContext()
 
@@ -32,6 +35,11 @@ export function WorkerProvider(props) {
     const [urlConnexion, setUrlConnexion] = useState('')
     const [config, setConfig] = useState('')
 
+    const store = useMemo(()=>{
+      if(!workersPrets) return
+      return storeSetup(_workers)
+    }, [workersPrets])
+  
     const etatPret = useMemo(()=>{
         return workersPrets
     }, [workersPrets])
@@ -58,7 +66,11 @@ export function WorkerProvider(props) {
 
     if(!workersPrets) return props.attente
 
-    return <Context.Provider value={value}>{props.children}</Context.Provider>
+    return (
+        <ReduxProvider store={store}>
+            <Context.Provider value={value}>{props.children}</Context.Provider>
+        </ReduxProvider>
+    )
 }
 
 export function WorkerContext(props) {

@@ -1,4 +1,6 @@
-import { Suspense, useState, useCallback, useEffect } from 'react'
+import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { proxy as comlinkProxy } from 'comlink'
+import { useSelector, useDispatch } from 'react-redux'
 
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
@@ -41,26 +43,39 @@ function LayoutMain(props) {
   const etatPret = useEtatPret()
   const urlConnexion = useUrlConnexion()
   const config = useConfig()
+  const dispatch = useDispatch()
 
   const [token, setToken] = useState('')
-
+  const [correlationSubmitId, setCorrelationSubmitId] = useState('')
   const resetTokenHandler = useCallback(()=>setToken(''), [setToken])
 
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
     getToken(urlConnexion, config.application_id)
-      .then(setToken)
+      .then(data=>{
+        setToken(data.token)
+        setCorrelationSubmitId(data.uuid_transaction)
+        // dispatch() // TODO Set correlation Id
+      })
       .catch(err=>console.error("Erreur chargement token ", err))
-  }, [config, urlConnexion, token, setToken])
+  }, [dispatch, config, urlConnexion, token, setToken, setCorrelationSubmitId])
+
+  useEffect(()=>{
+    const urlUpload = urlConnexion + '/public/fichiers'
+    console.debug("!Update path serveur pour upload fichiers : %s ", urlUpload)
+    workers.transfertFichiers.up_setPathServeur(urlUpload)
+      .catch(err=>console.error("Erreur changement URL connexion pour upload", err))
+  }, [workers, urlConnexion])
 
   return (
     <Container>
-      <h1>Sample form</h1>
+      <h1>Sample form 1</h1>
       <Alert variant='info'>
         <Alert.Heading>Information backend</Alert.Heading>
         <p>Application Id : {config.application_id}</p>
         <p>URL connexion : {urlConnexion}</p>
         <p>Etat pret : {etatPret?'Oui':'Non'}</p>
+        <p>Correlation Submit Id : {correlationSubmitId}</p>
         <div>
           <div>Token session</div>
           <div style={{'fontSize': 'x-small'}}>{token.replaceAll('\.', '\. ')}</div>
@@ -69,6 +84,7 @@ function LayoutMain(props) {
 
       <FormApplication 
         token={token}
+        correlationSubmitId={correlationSubmitId}
         resetToken={resetTokenHandler} />
 
     </Container>
@@ -81,13 +97,22 @@ function Attente(props) {
 
 function FormApplication(props) {
 
-  const { token, resetToken } = props
+  const { token, resetToken, correlationSubmitId } = props
 
   const workers = useWorkers(),
         urlConnexion = useUrlConnexion(),
         config = useConfig()
 
   const [champ1, setChamp1] = useState('')
+  const [ preparationUploadEnCours, setPreparationUploadEnCours ] = useState(false)
+
+  const signalAnnuler = useMemo(()=>{
+    let valeur = false
+    return {
+        setValeur: v => { valeur = v },
+        signal: comlinkProxy(() => valeur)
+    }
+  }, [])
 
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
 
@@ -122,6 +147,17 @@ function FormApplication(props) {
         </Col>
       </Form.Group>
 
+      <Row>
+        <Col>
+          <BoutonUpload 
+            setPreparationUploadEnCours={setPreparationUploadEnCours} 
+            signalAnnuler={signalAnnuler.signal}
+            correlationSubmitId={correlationSubmitId}>
+            <i className="fa fa-plus"/> Fichier
+          </BoutonUpload>
+        </Col>
+      </Row>
+
       <br/>
 
       <Row>
@@ -129,6 +165,7 @@ function FormApplication(props) {
           <Button onClick={submitHandler}>Submit</Button>
         </Col>
       </Row>
+
     </div>
   )
 }
@@ -143,8 +180,9 @@ async function getToken(urlConnexion, application_id) {
     const reponse = await axiosImport.default.get(urlToken.href)
     const data = reponse.data
     console.debug("Reponse token ", data)
-    const token = data.token
-    return token
+    return data
+    //const token = data.token
+    //return token
 }
 
 async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
@@ -181,4 +219,93 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   })
 
   return reponse.data
+}
+
+function BoutonUpload(props) {
+
+  const { setPreparationUploadEnCours, signalAnnuler, resetAnnuler, correlationSubmitId } = props
+
+  const refUpload = useRef()
+  const workers = useWorkers()
+  // const usager = useUsager()
+  const dispatch = useDispatch()
+  // const cuuid = useSelector(state=>state.fichiers.cuuid)
+
+  const [className, setClassName] = useState('')
+
+  const { traitementFichiers } = workers
+
+  const handlerPreparationUploadEnCours = useCallback(event=>{
+      // console.debug('handlerPreparationUploadEnCours ', event)
+      setPreparationUploadEnCours(event)
+  }, [setPreparationUploadEnCours])
+
+  const upload = useCallback( acceptedFiles => {
+      console.debug("Files : %O pour correlationSubmitId: %s, signalAnnuler: %O", acceptedFiles, correlationSubmitId, signalAnnuler)
+      
+      handlerPreparationUploadEnCours(0)  // Debut preparation
+
+      traitementFichiers.traiterAcceptedFiles(dispatch, correlationSubmitId, null, acceptedFiles, {signalAnnuler, setProgres: handlerPreparationUploadEnCours})
+          .then(uploads=>{
+              console.debug("Uploads ", uploads)
+              // const correlationIds = uploads.map(item=>item.correlation)
+              // return dispatch(demarrerUploads(workers, correlationIds))
+          })
+          .catch(err=>console.error("Erreur fichiers : %O", err))
+          .finally( () => handlerPreparationUploadEnCours(false) )
+
+  }, [handlerPreparationUploadEnCours, traitementFichiers, dispatch, correlationSubmitId])
+
+  const fileChange = event => {
+      event.preventDefault()
+      setClassName('')
+
+      const acceptedFiles = event.currentTarget.files
+      upload(acceptedFiles)
+  }
+
+  const onButtonDrop = event => {
+      event.preventDefault()
+      setClassName('')
+
+      const acceptedFiles = event.dataTransfer.files
+      upload(acceptedFiles)
+  }
+
+  const handlerOnDragover = event => {
+      event.preventDefault()
+      setClassName('dropping')
+      event.dataTransfer.dropEffect = "move"
+  }
+
+  const handlerOnDragLeave = event => { event.preventDefault(); setClassName(''); }
+
+  const handlerOnClick = event => {
+      refUpload.current.click()
+  }
+
+  return (
+      <div 
+          className={'upload ' + className}
+          onDrop={onButtonDrop}
+          onDragOver={handlerOnDragover} 
+          onDragLeave={handlerOnDragLeave}
+        >
+          <Button 
+              variant="secondary" 
+              className="individuel"
+              onClick={handlerOnClick}
+              disabled={!correlationSubmitId}
+            >
+              {props.children}
+          </Button>
+          <input
+              id='file_upload'
+              type='file' 
+              ref={refUpload}
+              multiple
+              onChange={fileChange}
+            />
+      </div>
+  )
 }
