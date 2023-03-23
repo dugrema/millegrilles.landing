@@ -31,8 +31,8 @@ function createObjectStores(db, oldVersion) {
         switch(oldVersion) {
             case 0:
             case 1: 
-                db.createObjectStore(STORE_UPLOADS, {keyPath: 'correlation'})
-                db.createObjectStore(STORE_UPLOADS_FICHIERS, {keyPath: ['correlation', 'position']})
+                db.createObjectStore(STORE_UPLOADS, {keyPath: ['correlationSubmitId', 'correlation']})
+                db.createObjectStore(STORE_UPLOADS_FICHIERS, {keyPath: ['correlationSubmitId', 'correlation', 'position']})
             case 2: // Plus recent, rien a faire
                 break
             default:
@@ -55,15 +55,15 @@ export async function entretien() {
     await retirerUploadsExpires(db)
 }
 
-export async function chargerUploads(userId) {
-    if(!userId) throw new Error("Il faut fournir le userId")
+export async function chargerUploads(correlationSubmidId) {
+    if(!correlationSubmidId) throw new Error("Il faut fournir le userId")
     const db = await ouvrirDB()
     const store = db.transaction(STORE_UPLOADS, 'readonly').store
     let curseur = await store.openCursor()
     const uploads = []
     while(curseur) {
-        const userIdCurseur = curseur.value.userId
-        if(userIdCurseur === userId) uploads.push(curseur.value)
+        const correlationSubmidIdCurseur = curseur.value.correlationSubmidId
+        if(correlationSubmidIdCurseur === correlationSubmidId) uploads.push(curseur.value)
         curseur = await curseur.continue()
     }
     return uploads
@@ -71,14 +71,15 @@ export async function chargerUploads(userId) {
 
 // doc { correlation, dateCreation, retryCount, transactionGrosfichiers, transactionMaitredescles }
 export async function updateFichierUpload(doc) {
-    const { correlation, userId } = doc
+    const { correlationSubmitId, correlation } = doc
+    if(!correlationSubmitId) throw new Error('updateFichierUpload Le document doit avoir un champ correlationSubmitId')
     if(!correlation) throw new Error('updateFichierUpload Le document doit avoir un champ correlation')
 
     const db = await ouvrirDB()
     const store = db.transaction(STORE_UPLOADS, 'readwrite').store
     let docExistant = await store.get(correlation)
     if(!docExistant) {
-        if(!userId) throw new Error('updateFichierUpload Le document doit avoir un champ userId')
+        if(!correlationSubmitId) throw new Error('updateFichierUpload Le document doit avoir un champ correlationSubmitId')
         docExistant = {...doc}
     } else {
         Object.assign(docExistant, doc)
@@ -89,7 +90,8 @@ export async function updateFichierUpload(doc) {
     await store.put(docExistant)
 }
 
-export async function ajouterFichierUploadFile(correlation, position, data) {
+export async function ajouterFichierUploadFile(correlationSubmitId, correlation, position, data) {
+    if(!correlationSubmitId) throw new Error('ajouterFichierUpload Le document doit avoir un champ correlationSubmitId')
     if(!correlation) throw new Error('ajouterFichierUpload Le document doit avoir un champ correlation')
     if(typeof(position) !== 'number') throw new Error('ajouterFichierUpload Il faut fournir une position')
     if(data.length === 0) return   // Rien a faire
@@ -100,18 +102,19 @@ export async function ajouterFichierUploadFile(correlation, position, data) {
     const store = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     const blob = new Blob([data])
     const taille = data.length
-    await store.put({correlation, position, taille, data: blob})
+    await store.put({correlationSubmitId, correlation, position, taille, data: blob})
 }
 
-export async function supprimerFichier(correlation) {
+export async function supprimerFichier(correlationSubmitId, correlation) {
     const db = await ouvrirDB()
     const storeFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     
     // Supprimer fichiers (blobs)
     let cursorFichiers = await storeFichiers.openCursor()
     while(cursorFichiers) {
+        const correlationSubmitIdCursor = cursorFichiers.value.correlationSubmitId
         const correlationCursor = cursorFichiers.value.correlation
-        if(correlationCursor === correlation) {
+        if(correlationSubmitIdCursor === correlationSubmitId && correlationCursor === correlation) {
             // console.debug("Delete cursorFichiers : ", cursorFichiers.value)
             await cursorFichiers.delete()
         }
@@ -120,7 +123,7 @@ export async function supprimerFichier(correlation) {
 
     // Supprimer entree upload
     const storeUploads = db.transaction(STORE_UPLOADS, 'readwrite').store
-    await storeUploads.delete(correlation)
+    await storeUploads.delete([correlationSubmitId, correlation])
 }
 
 // Supprime le contenu de idb
@@ -133,6 +136,7 @@ export async function clear() {
 }
 
 export async function supprimerParEtat(userId, etat) {
+    throw new Error('supprimerParEtat - fix me')
     // console.debug("supprimerParEtat userId %s etat %s ", userId, etat)
     if(!userId) throw new Error("userId est requis pour supprimerParEtat")
     if(etat === undefined) throw new Error("etat est requis pour supprimerParEtat")
@@ -171,16 +175,16 @@ export async function supprimerParEtat(userId, etat) {
     }
 }
 
-export async function getPartsFichier(correlation) {
-    if(correlation === undefined) return
+export async function getPartsFichier(correlationSubmitId, correlation) {
+    if(correlationSubmitId === undefined || correlation === undefined) return
     const db = await ouvrirDB()
     const storeUploadsFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readonly').store
     const parts = []
     let curseur = await storeUploadsFichiers.openCursor()
     while(curseur) {
         const {key, value} = curseur
-        const [correlationCurseur] = key
-        if(correlationCurseur === correlation) parts.push(value)
+        const [correlationSubmitIdCurseur, correlationCurseur] = key
+        if(correlationCurseur === correlation && correlationSubmitIdCurseur === correlationSubmitId) parts.push(value)
         curseur = await curseur.continue()
     }
     return parts
@@ -200,16 +204,16 @@ async function retirerUploadsExpires(db) {
     }
 }
 
-export async function supprimerPartsFichier(correlation) {
-    if(correlation === undefined) return
+export async function supprimerPartsFichier(correlationSubmitId, correlation) {
+    if(correlationSubmitId === undefined || correlation === undefined) return
 
     const db = await ouvrirDB()
     const storeUploadsFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     let curseur = await storeUploadsFichiers.openCursor()
     while(curseur) {
         const {key} = curseur
-        const [correlationCurseur] = key
-        if(correlationCurseur === correlation) await curseur.delete()
+        const [correlationSubmitIdCurseur, correlationCurseur] = key
+        if(correlationSubmitIdCurseur === correlationSubmitId && correlationCurseur === correlation) await curseur.delete()
         curseur = await curseur.continue()
     }
 }

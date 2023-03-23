@@ -36,8 +36,13 @@ async function traiterAcceptedFiles(workers, dispatch, correlationSubmitId, cuui
     await transfertFichiers.up_setCertificats(certificatsMaitredescles)
     console.debug("Certificat maitre des cles OK")
 
-    const ajouterPartProxy = Comlink.proxy((correlation, compteurPosition, chunk) => ajouterPart(workers, correlation, compteurPosition, chunk))
-    const updateFichierProxy = Comlink.proxy((doc, opts) => updateFichier(workers, dispatch, doc, opts))
+    const ajouterPartProxy = Comlink.proxy(
+        (correlation, compteurPosition, chunk) => ajouterPart(workers, correlationSubmitId, correlation, compteurPosition, chunk)
+    )
+    const updateFichierProxy = Comlink.proxy((doc, opts) => {
+        const docWithIds = {...doc, correlationSubmitId}
+        return updateFichier(workers, dispatch, docWithIds, opts)
+    })
     const setProgresProxy = setProgres?Comlink.proxy(setProgres):null
     const resultat = await transfertFichiers.traiterAcceptedFiles(
         acceptedFiles, correlationSubmitId, cuuid, 
@@ -49,10 +54,10 @@ async function traiterAcceptedFiles(workers, dispatch, correlationSubmitId, cuui
     return resultat
 }
 
-async function ajouterPart(workers, correlation, compteurPosition, chunk) {
+async function ajouterPart(workers, correlationSubmitId, correlation, compteurPosition, chunk) {
     const { uploadFichiersDao } = workers
     console.debug("ajouterPart %s position %d : %O", correlation, compteurPosition, chunk)
-    await uploadFichiersDao.ajouterFichierUploadFile(correlation, compteurPosition, chunk)
+    await uploadFichiersDao.ajouterFichierUploadFile(correlationSubmitId, correlation, compteurPosition, chunk)
 }
 
 async function updateFichier(workers, dispatch, doc, opts) {
