@@ -13,7 +13,7 @@ function initialiser(amqpdao, opts) {
   const route = express.Router()
 
   // Section publique (aucune authentification, juste tokens JWT)
-  route.use('/public', routesPubliques())
+  route.use('/public', routesPubliques(amqpdao))
   route.get('/protectionpublique', protectionPublique)
 
   // Section privee

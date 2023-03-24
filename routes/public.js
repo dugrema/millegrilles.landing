@@ -1,15 +1,18 @@
 import debugLib from 'debug'
 import express from 'express'
-import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
 import { v4 as uuidv4 } from 'uuid'
+
+import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
+import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
 
 const debug = debugLib('landing:public')
 
 // Routes publiques
-function routesPubliques() {
+function routesPubliques(mq) {
     const router = express.Router()
     router.get('/token', getToken)
     router.post('/submit', express.json(), verifierToken, submitForm)
+    router.use('/fichiers', verifierToken, routerFichiers(mq))
     return router
 }
 
@@ -19,7 +22,10 @@ async function getToken(req, res) {
     const queryParams = req.query
     const application_id = queryParams.application_id
   
-    if(!application_id) return res.sendStatus(400)  // Manque application_id
+    if(!application_id) {
+      debug("getToken ERREUR application_id manquant")
+      return res.sendStatus(400)  // Manque application_id
+    }
   
     const opts = {expiration: '2h'}
     const uuid_transaction = ''+uuidv4()
@@ -32,10 +38,17 @@ async function getToken(req, res) {
 export async function verifierToken(req, res, next) {
     const mq = req.amqpdao
     const body = req.body || {}
+    const token = body.token || req.headers['x-token-jwt']
+    if(!token) {
+      debug("verifierToken ERREUR token manquant")
+      return res.status(400).send({ok: false, err: 'Token manquant'})
+    }
     try {
-        const token = body.token || req.headers['x-token-jwt']
         var tokenInfo = await verifierTokenApplication(mq.pki, token)
-        res.token = tokenInfo
+        debug("verifierToken info ", tokenInfo)
+        req.jwtsrc = token
+        req.token = tokenInfo
+        req.batchId = tokenInfo.payload.sub
         next()
     } catch(err) {
         console.error(new Date() + " ERROR landingFichiers Erreur token : ", err)
@@ -52,11 +65,15 @@ async function submitForm(req, res) {
     // Verifier le token JWT
     const { message } = body
   
-    if(!message) return res.status(400).send({ok: false, err: 'Message missing'})
+    if(!message) {
+      debug("submitForm ERREUR message manquant")
+      return res.status(400).send({ok: false, err: 'Message missing'})
+    }
   
     try {
-      const tokenInfo = res.token
+      const tokenInfo = req.token
       if(!tokenInfo) {
+        debug("submitForm ERREUR token manquant")
         return res.status(401).send({ok: false, err: "Missing token"})
       }
       debug("Token Info : ", tokenInfo)
@@ -69,7 +86,10 @@ async function submitForm(req, res) {
       // S'assurer que le token n'a pas deja ete utilise avec redis
       const cleRedisSubmit = `landing:submit:${uuid_transaction}`
       const tokenDejaUtilise = await redisClient.get(cleRedisSubmit)
-      if(tokenDejaUtilise) return res.status(400).send({ok: false, err: 'Token deja utilise'})
+      if(tokenDejaUtilise) {
+        debug("submitForm ERREUR Token deja utilise")
+        return res.status(400).send({ok: false, err: 'Token deja utilise'})
+      }
 
       // Charger configuration application
       const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
@@ -131,4 +151,18 @@ async function formatterTransactionMessagerie(mq, infoApplication, uuid_transact
   }
 
   return transaction
+}
+
+// Router /landing/fichiers
+function routerFichiers(mq) {
+  const router = express.Router()
+
+  router.put('/:correlation/:position', middlewareRecevoirFichier())
+  router.post('/:correlation', express.json(), middlewareReadyFichier(mq))
+
+  const deleteHandler = middlewareDeleteStaging()
+  router.delete('/:correlation', deleteHandler)
+  router.delete(deleteHandler)
+
+  return router
 }

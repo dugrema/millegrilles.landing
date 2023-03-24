@@ -31,8 +31,8 @@ function createObjectStores(db, oldVersion) {
         switch(oldVersion) {
             case 0:
             case 1: 
-                db.createObjectStore(STORE_UPLOADS, {keyPath: ['correlationSubmitId', 'correlation']})
-                db.createObjectStore(STORE_UPLOADS_FICHIERS, {keyPath: ['correlationSubmitId', 'correlation', 'position']})
+                db.createObjectStore(STORE_UPLOADS, {keyPath: ['batchId', 'correlation']})
+                db.createObjectStore(STORE_UPLOADS_FICHIERS, {keyPath: ['batchId', 'correlation', 'position']})
             case 2: // Plus recent, rien a faire
                 break
             default:
@@ -71,15 +71,15 @@ export async function chargerUploads(correlationSubmidId) {
 
 // doc { correlation, dateCreation, retryCount, transactionGrosfichiers, transactionMaitredescles }
 export async function updateFichierUpload(doc) {
-    const { correlationSubmitId, correlation } = doc
-    if(!correlationSubmitId) throw new Error('updateFichierUpload Le document doit avoir un champ correlationSubmitId')
+    const { batchId, correlation } = doc
+    if(!batchId) throw new Error('updateFichierUpload Le document doit avoir un champ batchId')
     if(!correlation) throw new Error('updateFichierUpload Le document doit avoir un champ correlation')
 
     const db = await ouvrirDB()
     const store = db.transaction(STORE_UPLOADS, 'readwrite').store
     let docExistant = await store.get(correlation)
     if(!docExistant) {
-        if(!correlationSubmitId) throw new Error('updateFichierUpload Le document doit avoir un champ correlationSubmitId')
+        if(!batchId) throw new Error('updateFichierUpload Le document doit avoir un champ batchId')
         docExistant = {...doc}
     } else {
         Object.assign(docExistant, doc)
@@ -90,8 +90,8 @@ export async function updateFichierUpload(doc) {
     await store.put(docExistant)
 }
 
-export async function ajouterFichierUploadFile(correlationSubmitId, correlation, position, data) {
-    if(!correlationSubmitId) throw new Error('ajouterFichierUpload Le document doit avoir un champ correlationSubmitId')
+export async function ajouterFichierUploadFile(batchId, correlation, position, data) {
+    if(!batchId) throw new Error('ajouterFichierUpload Le document doit avoir un champ batchId')
     if(!correlation) throw new Error('ajouterFichierUpload Le document doit avoir un champ correlation')
     if(typeof(position) !== 'number') throw new Error('ajouterFichierUpload Il faut fournir une position')
     if(data.length === 0) return   // Rien a faire
@@ -102,19 +102,19 @@ export async function ajouterFichierUploadFile(correlationSubmitId, correlation,
     const store = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     const blob = new Blob([data])
     const taille = data.length
-    await store.put({correlationSubmitId, correlation, position, taille, data: blob})
+    await store.put({batchId, correlation, position, taille, data: blob})
 }
 
-export async function supprimerFichier(correlationSubmitId, correlation) {
+export async function supprimerFichier(batchId, correlation) {
     const db = await ouvrirDB()
     const storeFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     
     // Supprimer fichiers (blobs)
     let cursorFichiers = await storeFichiers.openCursor()
     while(cursorFichiers) {
-        const correlationSubmitIdCursor = cursorFichiers.value.correlationSubmitId
+        const batchIdCursor = cursorFichiers.value.batchId
         const correlationCursor = cursorFichiers.value.correlation
-        if(correlationSubmitIdCursor === correlationSubmitId && correlationCursor === correlation) {
+        if(batchIdCursor === batchId && correlationCursor === correlation) {
             // console.debug("Delete cursorFichiers : ", cursorFichiers.value)
             await cursorFichiers.delete()
         }
@@ -123,7 +123,7 @@ export async function supprimerFichier(correlationSubmitId, correlation) {
 
     // Supprimer entree upload
     const storeUploads = db.transaction(STORE_UPLOADS, 'readwrite').store
-    await storeUploads.delete([correlationSubmitId, correlation])
+    await storeUploads.delete([batchId, correlation])
 }
 
 // Supprime le contenu de idb
@@ -175,16 +175,16 @@ export async function supprimerParEtat(userId, etat) {
     }
 }
 
-export async function getPartsFichier(correlationSubmitId, correlation) {
-    if(correlationSubmitId === undefined || correlation === undefined) return
+export async function getPartsFichier(batchId, correlation) {
+    if(batchId === undefined || correlation === undefined) return
     const db = await ouvrirDB()
     const storeUploadsFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readonly').store
     const parts = []
     let curseur = await storeUploadsFichiers.openCursor()
     while(curseur) {
         const {key, value} = curseur
-        const [correlationSubmitIdCurseur, correlationCurseur] = key
-        if(correlationCurseur === correlation && correlationSubmitIdCurseur === correlationSubmitId) parts.push(value)
+        const [batchIdCurseur, correlationCurseur] = key
+        if(correlationCurseur === correlation && batchIdCurseur === batchId) parts.push(value)
         curseur = await curseur.continue()
     }
     return parts
@@ -204,16 +204,16 @@ async function retirerUploadsExpires(db) {
     }
 }
 
-export async function supprimerPartsFichier(correlationSubmitId, correlation) {
-    if(correlationSubmitId === undefined || correlation === undefined) return
+export async function supprimerPartsFichier(batchId, correlation) {
+    if(batchId === undefined || correlation === undefined) return
 
     const db = await ouvrirDB()
     const storeUploadsFichiers = db.transaction(STORE_UPLOADS_FICHIERS, 'readwrite').store
     let curseur = await storeUploadsFichiers.openCursor()
     while(curseur) {
         const {key} = curseur
-        const [correlationSubmitIdCurseur, correlationCurseur] = key
-        if(correlationSubmitIdCurseur === correlationSubmitId && correlationCurseur === correlation) await curseur.delete()
+        const [batchIdCurseur, correlationCurseur] = key
+        if(batchIdCurseur === batchId && correlationCurseur === correlation) await curseur.delete()
         curseur = await curseur.continue()
     }
 }

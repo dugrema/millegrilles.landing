@@ -12,6 +12,7 @@ import Alert from 'react-bootstrap/Alert'
 import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
 import { chiffrerMessage } from './messageUtils'
+import { setToken, clearToken } from './redux/uploaderSlice'
 
 // Importer JS global
 import 'react-bootstrap/dist/react-bootstrap.min.js'
@@ -45,20 +46,18 @@ function LayoutMain(props) {
   const config = useConfig()
   const dispatch = useDispatch()
 
-  const [token, setToken] = useState('')
-  const [correlationSubmitId, setCorrelationSubmitId] = useState('')
-  const resetTokenHandler = useCallback(()=>setToken(''), [setToken])
+  const token = useSelector(state=>state.uploader.token)
+  const batchId = useSelector(state=>state.uploader.batchId)
 
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
     getToken(urlConnexion, config.application_id)
       .then(data=>{
-        setToken(data.token)
-        setCorrelationSubmitId(data.uuid_transaction)
+        dispatch(setToken({token: data.token, batchId: data.uuid_transaction}))
         // dispatch() // TODO Set correlation Id
       })
       .catch(err=>console.error("Erreur chargement token ", err))
-  }, [dispatch, config, urlConnexion, token, setToken, setCorrelationSubmitId])
+  }, [dispatch, config, urlConnexion, token])
 
   useEffect(()=>{
     const urlUpload = urlConnexion + '/public/fichiers'
@@ -75,17 +74,14 @@ function LayoutMain(props) {
         <p>Application Id : {config.application_id}</p>
         <p>URL connexion : {urlConnexion}</p>
         <p>Etat pret : {etatPret?'Oui':'Non'}</p>
-        <p>Correlation Submit Id : {correlationSubmitId}</p>
+        <p>Batch Id : {batchId}</p>
         <div>
           <div>Token session</div>
           <div style={{'fontSize': 'x-small'}}>{token.replaceAll('\.', '\. ')}</div>
         </div>
       </Alert>
 
-      <FormApplication 
-        token={token}
-        correlationSubmitId={correlationSubmitId}
-        resetToken={resetTokenHandler} />
+      <FormApplication />
 
     </Container>
   )
@@ -97,9 +93,11 @@ function Attente(props) {
 
 function FormApplication(props) {
 
-  const { token, resetToken, correlationSubmitId } = props
+  const token = useSelector(state=>state.uploader.token)
+  const batchId = useSelector(state=>state.uploader.batchId)
 
   const workers = useWorkers(),
+        dispatch = useDispatch(),
         urlConnexion = useUrlConnexion(),
         config = useConfig()
 
@@ -131,10 +129,10 @@ function FormApplication(props) {
     submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id})
       .then(r=>{
         console.debug("Reponse submit ", r)
-        resetToken()
+        dispatch(clearToken())
       })
       .catch(err=>console.error("Erreur submit form ", err))
-  }, [urlConnexion, workers, config, champ1, token, resetToken])
+  }, [dispatch, urlConnexion, workers, config, champ1, token])
 
   return (
     <div>
@@ -152,7 +150,8 @@ function FormApplication(props) {
           <BoutonUpload 
             setPreparationUploadEnCours={setPreparationUploadEnCours} 
             signalAnnuler={signalAnnuler.signal}
-            correlationSubmitId={correlationSubmitId}>
+            token={token}
+            batchId={batchId}>
             <i className="fa fa-plus"/> Fichier
           </BoutonUpload>
         </Col>
@@ -223,7 +222,7 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
 
 function BoutonUpload(props) {
 
-  const { setPreparationUploadEnCours, signalAnnuler, resetAnnuler, correlationSubmitId } = props
+  const { setPreparationUploadEnCours, signalAnnuler, token, batchId } = props
 
   const refUpload = useRef()
   const workers = useWorkers()
@@ -241,11 +240,11 @@ function BoutonUpload(props) {
   }, [setPreparationUploadEnCours])
 
   const upload = useCallback( acceptedFiles => {
-      console.debug("Files : %O pour correlationSubmitId: %s, signalAnnuler: %O", acceptedFiles, correlationSubmitId, signalAnnuler)
+      console.debug("Files : %O pour correlationSubmitId: %s, signalAnnuler: %O", acceptedFiles, batchId, signalAnnuler)
       
       handlerPreparationUploadEnCours(0)  // Debut preparation
 
-      traitementFichiers.traiterAcceptedFiles(dispatch, correlationSubmitId, null, acceptedFiles, {signalAnnuler, setProgres: handlerPreparationUploadEnCours})
+      traitementFichiers.traiterAcceptedFiles(dispatch, {acceptedFiles, token, batchId}, {signalAnnuler, setProgres: handlerPreparationUploadEnCours})
           .then(uploads=>{
               console.debug("Uploads ", uploads)
               // const correlationIds = uploads.map(item=>item.correlation)
@@ -254,7 +253,7 @@ function BoutonUpload(props) {
           .catch(err=>console.error("Erreur fichiers : %O", err))
           .finally( () => handlerPreparationUploadEnCours(false) )
 
-  }, [handlerPreparationUploadEnCours, traitementFichiers, dispatch, correlationSubmitId])
+  }, [handlerPreparationUploadEnCours, traitementFichiers, dispatch, token, batchId])
 
   const fileChange = event => {
       event.preventDefault()
@@ -295,7 +294,7 @@ function BoutonUpload(props) {
               variant="secondary" 
               className="individuel"
               onClick={handlerOnClick}
-              disabled={!correlationSubmitId}
+              disabled={!token}
             >
               {props.children}
           </Button>

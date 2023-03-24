@@ -10,13 +10,21 @@ const ETAT_PREPARATION = 1,
 
 const initialState = {
     liste: [],                  // Liste de fichiers en traitement (tous etats confondus)
-    userId: '',                 // UserId courant, permet de stocker plusieurs users localement
+    token: '',                  // Token de la batch courante
+    batchId: '',                // Batch id courant
     progres: null,              // Pourcentage de progres en int
     completesCycle: [],         // Conserve la liste des uploads completes qui restent dans le total de progres
 }
 
-function setUserIdAction(state, action) {
-    state.userId = action.payload
+function setTokenAction(state, action) {
+    const { token, batchId } = action.payload
+    state.token = token
+    state.batchId = batchId
+}
+
+function clearTokenAction(state, action) {
+    state.token = null
+    state.batchId = null
 }
 
 function setUploadsAction(state, action) {
@@ -134,7 +142,8 @@ const uploadSlice = createSlice({
     name: 'uploader',
     initialState,
     reducers: {
-        setUserId: setUserIdAction,
+        setToken: setTokenAction,
+        clearToken: clearTokenAction,
         ajouterUpload: ajouterUploadAction,
         updateUpload: updateUploadAction,
         retirerUpload: retirerUploadAction,
@@ -148,7 +157,7 @@ const uploadSlice = createSlice({
 })
 
 export const { 
-    setUserId, ajouterUpload, updateUpload, retirerUpload, setUploads, 
+    setToken, clearToken, ajouterUpload, updateUpload, retirerUpload, setUploads, 
     clearUploadsState, supprimerUploadsParEtat, majContinuerUpload,
     arretUpload, clearCycleUpload,
 } = uploadSlice.actions
@@ -187,8 +196,8 @@ async function traiterSupprimerParEtat(workers, etat, dispatch, getState) {
     // console.debug("traiterSupprimerParEtat ", etat)
     const { uploadFichiersDao } = workers
     const state = getState().uploader
-    const userId = state.userId
-    await uploadFichiersDao.supprimerParEtat(userId, etat)
+    const batchId = state.batchId
+    await uploadFichiersDao.supprimerParEtat(batchId, etat)
     dispatch(supprimerUploadsParEtat(etat))
 }
 
@@ -204,9 +213,9 @@ async function traiterContinuerUpload(workers, dispatch, getState, opts) {
 
     const { uploadFichiersDao } = workers
     const state = getState().uploader
-    const userId = state.userId
+    const batchId = state.batchId
 
-    const uploads = await uploadFichiersDao.chargerUploads(userId)
+    const uploads = await uploadFichiersDao.chargerUploads(batchId)
     const uploadsIncomplets = uploads.filter(item => {
         if(correlation) return item.correlation === correlation
         else return [ETAT_UPLOAD_INCOMPLET, ETAT_ECHEC].includes(item.etat)
@@ -326,15 +335,15 @@ async function tacheUpload(workers, listenerApi, forkApi) {
 
     // Commencer boucle d'upload
     while(nextUpload) {
-        // console.debug("Next upload : %O", nextUpload)
-        const { correlationSubmitId, correlation } = nextUpload
+        console.debug("Next upload : %O", nextUpload)
+        const { batchId, correlation } = nextUpload
         try {
             await uploadFichier(workers, dispatch, nextUpload, cancelToken)
 
             // Trouver prochain upload
             if (forkApi.signal.aborted) {
                 // console.debug("tacheUpload annulee")
-                marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {etat: ETAT_UPLOAD_INCOMPLET})
+                marquerUploadEtat(workers, dispatch, batchId, correlation, {etat: ETAT_UPLOAD_INCOMPLET})
                     .catch(err=>console.error("Erreur marquer upload echec %s : %O", correlation, err))
                 return
             }
@@ -342,7 +351,7 @@ async function tacheUpload(workers, listenerApi, forkApi) {
 
         } catch (err) {
             console.error("Erreur tache upload correlation %s: %O", correlation, err)
-            marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {etat: ETAT_ECHEC})
+            marquerUploadEtat(workers, dispatch, batchId, correlation, {etat: ETAT_ECHEC})
                 .catch(err=>console.error("Erreur marquer upload echec %s : %O", correlation, err))
             throw err
         }
@@ -350,12 +359,12 @@ async function tacheUpload(workers, listenerApi, forkApi) {
 }
 
 async function uploadFichier(workers, dispatch, fichier, cancelToken) {
-    // console.debug("Upload fichier workers : ", workers)
+    console.debug("Upload fichier workers : ", workers)
     const { uploadFichiersDao, transfertFichiers, chiffrage } = workers
-    const { correlationSubmitId, correlation } = fichier
+    const { batchId, correlation, token } = fichier
 
     // Charger la liste des parts a uploader
-    let parts = await uploadFichiersDao.getPartsFichier(correlationSubmitId, correlation)
+    let parts = await uploadFichiersDao.getPartsFichier(batchId, correlation)
     
     // Retirer les partis qui sont deja uploadees
     let tailleCompletee = 0,
@@ -368,21 +377,21 @@ async function uploadFichier(workers, dispatch, fichier, cancelToken) {
     })
     // console.debug("Parts a uploader : ", parts)
 
-    await marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {etat: ETAT_UPLOADING})
+    await marquerUploadEtat(workers, dispatch, batchId, correlation, {etat: ETAT_UPLOADING})
 
     // Mettre a jour le retryCount
     retryCount++
-    await marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {retryCount})
+    await marquerUploadEtat(workers, dispatch, batchId, correlation, {retryCount})
 
     for await (const part of parts) {
         let tailleCumulative = tailleCompletee
         const position = part.position,
               partContent = part.data
-        await marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {tailleCompletee: tailleCumulative})
+        await marquerUploadEtat(workers, dispatch, batchId, correlation, {tailleCompletee: tailleCumulative})
         
         // await new Promise(resolve=>setTimeout(resolve, 250))
         const opts = {}
-        const resultatUpload = transfertFichiers.partUploader(correlationSubmitId, correlation, position, partContent, opts)
+        const resultatUpload = transfertFichiers.partUploader(token, correlation, position, partContent, opts)
         // await Promise.race([resultatUpload, cancelToken])
         await resultatUpload
         // console.debug("uploadFichier Resultat upload %s (cancelled? %O) : %O", correlation, cancelToken, resultatUpload)
@@ -394,30 +403,34 @@ async function uploadFichier(workers, dispatch, fichier, cancelToken) {
 
         tailleCompletee += part.taille
         positionsCompletees = [...positionsCompletees, position]
-        await marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {tailleCompletee, positionsCompletees})
+        await marquerUploadEtat(workers, dispatch, batchId, correlation, {tailleCompletee, positionsCompletees})
     }
 
     // Signer et uploader les transactions
-    const transactionMaitredescles = {...fichier.transactionMaitredescles}
-    const partitionMaitreDesCles = transactionMaitredescles['_partition']
-    delete transactionMaitredescles['_partition']
-    const cles = await chiffrage.formatterMessage(
-        transactionMaitredescles, 'MaitreDesCles', {partition: partitionMaitreDesCles, action: 'sauvegarderCle', DEBUG: false})
+    // const transactionMaitredescles = {...fichier.transactionMaitredescles}
+    // const partitionMaitreDesCles = transactionMaitredescles['_partition']
+    // delete transactionMaitredescles['_partition']
+    // const cles = await chiffrage.formatterMessage(
+    //     transactionMaitredescles, 'MaitreDesCles', {partition: partitionMaitreDesCles, action: 'sauvegarderCle', DEBUG: false})
 
-    const transaction = await chiffrage.formatterMessage(
-        fichier.transactionGrosfichiers, 'GrosFichiers', {action: 'nouvelleVersion'})
+    // const transaction = await chiffrage.formatterMessage(
+    //     fichier.transactionGrosfichiers, 'GrosFichiers', {action: 'nouvelleVersion'})
 
     // console.debug("Transactions signees : %O, %O", cles, transaction)
-    await transfertFichiers.confirmerUpload(correlationSubmitId, correlation, cles, transaction)
+    // await transfertFichiers.confirmerUpload(token, batchId, correlation, fichier.transactionMaitredescles, fichier.transactionGrosfichiers)
+    console.debug("uploadFichier Info fichiers uploade ", fichier)
+    const infoGrosFichiers = fichier.transactionGrosfichiers,
+          hachage = infoGrosFichiers.fuuid
+    await transfertFichiers.confirmerUpload(token, correlation, {hachage})
 
     // Upload complete, dispatch nouvel etat
-    await marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, {etat: ETAT_COMPLETE})
+    await marquerUploadEtat(workers, dispatch, batchId, correlation, {etat: ETAT_COMPLETE})
     await dispatch(confirmerUpload(workers, correlation))
         .catch(err=>console.error("Erreur cleanup fichier upload ", err))
 }
 
-async function marquerUploadEtat(workers, dispatch, correlationSubmitId, correlation, etat) {
-    const contenu = {correlationSubmitId, correlation, ...etat}
+async function marquerUploadEtat(workers, dispatch, batchId, correlation, etat) {
+    const contenu = {batchId, correlation, ...etat}
     const { uploadFichiersDao } = workers
     
     await uploadFichiersDao.updateFichierUpload(contenu)

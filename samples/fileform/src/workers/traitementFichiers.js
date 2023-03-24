@@ -3,9 +3,9 @@ import * as Comlink from 'comlink'
 
 function setup(workers) {
     return {
-        traiterAcceptedFiles(dispatch, usager, cuuid, acceptedFiles, opts) {
+        traiterAcceptedFiles(dispatch, params, opts) {
             opts = opts || {}
-            return traiterAcceptedFiles(workers, dispatch, usager, cuuid, acceptedFiles, opts)
+            return traiterAcceptedFiles(workers, dispatch, params, opts)
         },
         // resLoader,
         clean,
@@ -25,27 +25,28 @@ async function clean(urlBlobPromise) {
     }
 }
 
-async function traiterAcceptedFiles(workers, dispatch, correlationSubmitId, cuuid, acceptedFiles, opts) {
+async function traiterAcceptedFiles(workers, dispatch, params, opts) {
     opts = opts || {}
     console.debug("Workers : ", workers)
+    const { acceptedFiles, token, batchId, cuuid } = params
     const { setProgres, signalAnnuler } = opts
     const { transfertFichiers } = workers
-    console.debug("traiterAcceptedFiles Debut pour correlationSubmitId %s, cuuid %s, fichiers %O", correlationSubmitId, cuuid, acceptedFiles)
+    console.debug("traiterAcceptedFiles Debut pour batchId %s, fichiers %O", batchId, acceptedFiles)
 
     const certificatsMaitredescles = await workers.config.getClesChiffrage()
     await transfertFichiers.up_setCertificats(certificatsMaitredescles)
     console.debug("Certificat maitre des cles OK")
 
     const ajouterPartProxy = Comlink.proxy(
-        (correlation, compteurPosition, chunk) => ajouterPart(workers, correlationSubmitId, correlation, compteurPosition, chunk)
+        (correlation, compteurPosition, chunk) => ajouterPart(workers, batchId, correlation, compteurPosition, chunk)
     )
     const updateFichierProxy = Comlink.proxy((doc, opts) => {
-        const docWithIds = {...doc, correlationSubmitId}
+        const docWithIds = {...doc, batchId}
         return updateFichier(workers, dispatch, docWithIds, opts)
     })
     const setProgresProxy = setProgres?Comlink.proxy(setProgres):null
-    const resultat = await transfertFichiers.traiterAcceptedFiles(
-        acceptedFiles, correlationSubmitId, cuuid, 
+    const resultat = await transfertFichiers.traiterAcceptedFilesV2(
+        params, 
         ajouterPartProxy, 
         updateFichierProxy,
         setProgresProxy,
@@ -54,10 +55,10 @@ async function traiterAcceptedFiles(workers, dispatch, correlationSubmitId, cuui
     return resultat
 }
 
-async function ajouterPart(workers, correlationSubmitId, correlation, compteurPosition, chunk) {
+async function ajouterPart(workers, batchId, correlation, compteurPosition, chunk) {
     const { uploadFichiersDao } = workers
     console.debug("ajouterPart %s position %d : %O", correlation, compteurPosition, chunk)
-    await uploadFichiersDao.ajouterFichierUploadFile(correlationSubmitId, correlation, compteurPosition, chunk)
+    await uploadFichiersDao.ajouterFichierUploadFile(batchId, correlation, compteurPosition, chunk)
 }
 
 async function updateFichier(workers, dispatch, doc, opts) {
@@ -81,5 +82,6 @@ async function updateFichier(workers, dispatch, doc, opts) {
     await uploadFichiersDao.updateFichierUpload(doc)
 
     // Declencher l'upload si applicable
+    console.debug("Ajouter upload ", doc)
     if(demarrer) dispatch(ajouterUpload(doc))
 }
