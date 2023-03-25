@@ -3,17 +3,20 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 
 import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
-import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging, preparerTransfertBatch } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
+// import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging, preparerTransfertBatch } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
+import FichiersMiddleware from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
 import { ajouterFichierConsignation } from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
 
 const debug = debugLib('landing:public')
 
 // Routes publiques
 function routesPubliques(mq) {
+    const fichiersMiddleware = new FichiersMiddleware(mq)
+
     const router = express.Router()
     router.get('/token', getToken)
-    router.post('/submit', express.json(), verifierToken, submitForm)
-    router.use('/fichiers', verifierToken, routerFichiers(mq))
+    router.post('/submit', express.json(), verifierToken, (req, res)=>submitForm(fichiersMiddleware, req, res))
+    router.use('/fichiers', verifierToken, routerFichiers(fichiersMiddleware))
     return router
 }
 
@@ -57,7 +60,7 @@ export async function verifierToken(req, res, next) {
     }
 }
 
-async function submitForm(req, res) {
+async function submitForm(fichiersMiddleware, req, res) {
     const mq = req.amqpdao
     const redisClient = req.redisClient  //amqpdaoInst.pki.redisClient
     const body = req.body
@@ -104,7 +107,7 @@ async function submitForm(req, res) {
 
       // Preparer batch fichiers
       if(message.fuuids) {
-        await preparerTransfertBatch(uuid_transaction)
+        await fichiersMiddleware.preparerTransfertBatch(uuid_transaction)
       }
 
       // Soumettre la transaction
@@ -163,13 +166,13 @@ async function formatterTransactionMessagerie(mq, infoApplication, uuid_transact
 }
 
 // Router /landing/fichiers
-function routerFichiers(mq) {
+function routerFichiers(fichiersMiddleware) {
   const router = express.Router()
 
-  router.put('/:correlation/:position', middlewareRecevoirFichier())
-  router.post('/:correlation', express.json(), middlewareReadyFichier(mq))
+  router.put('/:correlation/:position', fichiersMiddleware.middlewareRecevoirFichier())
+  router.post('/:correlation', express.json(), fichiersMiddleware.middlewareReadyFichier())
 
-  const deleteHandler = middlewareDeleteStaging()
+  const deleteHandler = fichiersMiddleware.middlewareDeleteStaging()
   router.delete('/:correlation', deleteHandler)
   router.delete(deleteHandler)
 
