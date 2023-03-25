@@ -268,7 +268,7 @@ async function traiterConfirmerUpload(workers, correlation, dispatch, getState) 
         uploadCopie.dateConfirmation = new Date().getTime()
 
         // Supprimer parts
-        await uploadFichiersDao.supprimerPartsFichier(correlation)
+        await uploadFichiersDao.supprimerPartsFichier(state.batchId, correlation)
 
         // Maj contenu upload
         await uploadFichiersDao.updateFichierUpload(uploadCopie)

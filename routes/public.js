@@ -3,7 +3,8 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 
 import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
-import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
+import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging, preparerTransfertBatch } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
+import { ajouterFichierConsignation } from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
 
 const debug = debugLib('landing:public')
 
@@ -101,6 +102,11 @@ async function submitForm(req, res) {
       const transaction = await formatterTransactionMessagerie(mq, infoApplication, uuid_transaction, message)
       console.debug("Transaction ", transaction)
 
+      // Preparer batch fichiers
+      if(message.fuuids) {
+        await preparerTransfertBatch(uuid_transaction)
+      }
+
       // Soumettre la transaction
       const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
       debug("Reponse recevoir : ", reponse)
@@ -110,6 +116,9 @@ async function submitForm(req, res) {
       redisClient.set(cleRedisSubmit, '1', {NX: true, EX: ttl})
         .catch(err=>console.error(new Date() + " ERROR submitForm Erreur sauvegarde cle redis submit " + cleRedisSubmit + " : " + err))
   
+      // Declencher le transfert de fichiers
+      ajouterFichierConsignation(uuid_transaction)
+
       return res.status(201).send({ok: true, uuid_transaction})
     } catch(err) {
       console.error(new Date() + ' ERROR submitForm ', err)

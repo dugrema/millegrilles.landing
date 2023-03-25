@@ -55,15 +55,15 @@ export async function entretien() {
     await retirerUploadsExpires(db)
 }
 
-export async function chargerUploads(correlationSubmidId) {
-    if(!correlationSubmidId) throw new Error("Il faut fournir le userId")
+export async function chargerUploads(batchId) {
+    if(!batchId) throw new Error("Il faut fournir le batchId")
     const db = await ouvrirDB()
     const store = db.transaction(STORE_UPLOADS, 'readonly').store
     let curseur = await store.openCursor()
     const uploads = []
     while(curseur) {
-        const correlationSubmidIdCurseur = curseur.value.correlationSubmidId
-        if(correlationSubmidIdCurseur === correlationSubmidId) uploads.push(curseur.value)
+        const batchIdCurseur = curseur.value.batchId
+        if(batchIdCurseur === batchId) uploads.push(curseur.value)
         curseur = await curseur.continue()
     }
     return uploads

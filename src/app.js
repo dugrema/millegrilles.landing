@@ -8,6 +8,8 @@ import { configurerEvenements } from './appSocketIo.js'
 import routeLanding from '../routes/landing.js'
 import * as mqdao from './mqdao.js'
 
+import { configurerThreadPutFichiersConsignation } from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
+
 const debug = debugLib('app')
 const { extraireExtensionsMillegrille } = forgecommon
 
@@ -25,6 +27,8 @@ export default async function app(params) {
           exchange: '2.prive'
         }
     )
+
+    configurerThreadPutFichiersConsignation(amqpdaoInst)
 
     socketIo.use((socket, next)=>{
       socket.mqdao = mqdao

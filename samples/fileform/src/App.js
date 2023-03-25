@@ -13,6 +13,7 @@ import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
 import { chiffrerMessage } from './messageUtils'
 import { setToken, clearToken } from './redux/uploaderSlice'
+import { chargerUploads } from './redux/uploaderIdbDao'
 
 // Importer JS global
 import 'react-bootstrap/dist/react-bootstrap.min.js'
@@ -49,6 +50,11 @@ function LayoutMain(props) {
   const token = useSelector(state=>state.uploader.token)
   const batchId = useSelector(state=>state.uploader.batchId)
 
+  const tokenFormatte = useMemo(()=>{
+    if(!token) return ''
+    return token.replaceAll('\.', '\. ')
+  }, [token])
+
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
     getToken(urlConnexion, config.application_id)
@@ -77,7 +83,7 @@ function LayoutMain(props) {
         <p>Batch Id : {batchId}</p>
         <div>
           <div>Token session</div>
-          <div style={{'fontSize': 'x-small'}}>{token.replaceAll('\.', '\. ')}</div>
+          <div style={{'fontSize': 'x-small'}}>{tokenFormatte}</div>
         </div>
       </Alert>
 
@@ -118,16 +124,18 @@ function FormApplication(props) {
     e.preventDefault()
     e.stopPropagation()
 
-    const contenu = `
-    <h2>Application Sample Form</h2>
-    <p>---</p>
-    <p>Champ 1 : ${champ1}</p>
-    <p>---</p>
-    `
-    const certificats = workers.config.getClesChiffrage()
-    console.debug("Submit %O, certificats %O", contenu, certificats)
-    submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id})
-      .then(r=>{
+    preparerFichiersBatch(batchId)
+      .then(async fichiers => {
+        console.debug("Fichiers : ", fichiers)
+        const contenu = `
+        <h2>Application Sample Form</h2>
+        <p>---</p>
+        <p>Champ 1 : ${champ1}</p>
+        <p>---</p>
+        `
+        const certificats = workers.config.getClesChiffrage()
+        console.debug("Submit %O, certificats %O", contenu, certificats)
+        const r = await submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id, fichiers})
         console.debug("Reponse submit ", r)
         dispatch(clearToken())
       })
@@ -137,6 +145,10 @@ function FormApplication(props) {
   return (
     <div>
       <h2>Form</h2>
+
+      {preparationUploadEnCours?
+        <p>Preparation upload : {preparationUploadEnCours}%</p>
+      :''}
 
       <Form.Group as={Row} controlId="champ1">
         <Form.Label column sm={4} md={2}>Champ 1</Form.Label>
@@ -191,6 +203,7 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   const from = 'Landing page'
   const subject = 'Sample Form ' + new Date()
   const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
+  if(opts.fichiers) optionsMessage.files = opts.fichiers
 
   const headerContenu = `
   <p>--- HEADER ---</p>
@@ -245,8 +258,7 @@ function BoutonUpload(props) {
       handlerPreparationUploadEnCours(0)  // Debut preparation
 
       traitementFichiers.traiterAcceptedFiles(dispatch, {acceptedFiles, token, batchId}, {signalAnnuler, setProgres: handlerPreparationUploadEnCours})
-          .then(uploads=>{
-              console.debug("Uploads ", uploads)
+          .then(()=>{
               // const correlationIds = uploads.map(item=>item.correlation)
               // return dispatch(demarrerUploads(workers, correlationIds))
           })
@@ -307,4 +319,30 @@ function BoutonUpload(props) {
             />
       </div>
   )
+}
+
+async function preparerFichiersBatch(batchId) {
+  console.debug("preparerFichiersBatch Uploads batch %s", batchId)
+  const uploads = await chargerUploads(batchId)
+  if(uploads.length === 0) return null
+
+  const mapping = []
+  for await (let item of uploads) {
+    console.debug("preparerFichiersBatch Mapper ", item)
+    const transaction = item.transactionGrosfichiers
+    const mimetype = transaction.mimetype,
+          fuuid = transaction.fuuid
+
+    const fichier = {
+      fuuid,
+      mimetype,
+      taille: item.taille,
+      taille_chiffree: item.taille_chiffree,
+      metadata: { ...item.metadataDechiffre },
+      cle: item.cle,
+    }
+    mapping.push(fichier)
+  }
+
+  return mapping
 }

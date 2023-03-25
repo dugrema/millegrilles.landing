@@ -48,21 +48,6 @@ function App() {
 }
 export default App
 
-// function ProviderReduxLayer() {
-
-//   const workers = useWorkers()
-//   const store = useMemo(()=>{
-//     if(!workers) return
-//     return storeSetup(workers)
-//   }, [workers])
-
-//   return (
-//     <ReduxProvider store={store}>
-//         <LayoutMain />
-//     </ReduxProvider>
-//   )
-// }
-
 function LayoutMain(props) {
 
   const { i18n, t } = useTranslation()
@@ -86,14 +71,6 @@ function LayoutMain(props) {
     const extensions = usager.extensions
     return extensions.delegationGlobale === 'proprietaire'
   }, [usager])
-
-  // Setup userId dans redux
-  // useEffect(()=>{
-  //   if(!usager) return
-  //   const userId = usager.extensions.userId
-  //   dispatch(setUserIdCategories(userId))
-  //   dispatch(setUserIdGroupes(userId))
-  // }, [dispatch, usager])
 
   const menu = (
     <MenuApp 
@@ -138,43 +115,6 @@ function ApplicationLanding(props) {
   const usager = useUsager()
 
   const [applicationId, setApplicationId] = useState('')
-
-  // const categoriesMajHandler = useCallback(comlinkProxy(message => {
-  //   dispatch(categoriesMergeItems(message.message))
-  // }), [dispatch])
-
-  // const groupesMajHandler = useCallback(comlinkProxy(message => {
-  //   // dispatch(groupesMergeItems(message.message))
-  //   dispatch(thunksGroupes.recevoirGroupe(workers, message.message))
-  // }), [dispatch])
-
-  // useEffect(()=>{
-  //   if(!etatPret || !usager) return
-
-  //   const userId = usager.extensions.userId
-  //   dispatch(setUserIdCategories(userId))
-  //   dispatch(setUserIdGroupes(userId))
-
-  //   // S'assurer d'avoir les categories les plus recentes
-  //   dispatch(thunksCategories.rafraichirCategories(workers))
-  //     .catch(err=>console.error("Erreur chargement categories ", err))
-
-  //   dispatch(thunksGroupes.rafraichirGroupes(workers))
-  //     .catch(err=>console.error("Erreur chargement groupes", err))
-
-  //   workers.connexion.ecouterEvenementsGroupesUsager(groupesMajHandler)
-  //     .catch(err=>console.error("Erreur ecouterEvenementsGroupesUsager ", err))
-
-  //   workers.connexion.ecouterEvenementsCategoriesUsager(categoriesMajHandler)
-  //     .catch(err=>console.error("Erreur ecouterEvenementsCategoriesUsager ", err))
-
-  //   return () => { 
-  //     workers.connexion.retirerEvenementsGroupesUsager()
-  //       .catch(err=>console.warn("Erreur retrait listener groupes ", err))
-  //     workers.connexion.retirerEvenementsCategoriesUsager()
-  //       .catch(err=>console.warn("Erreur retrait listener categories ", err))
-  //   }
-  // }, [workers, dispatch, etatPret, usager, categoriesMajHandler, groupesMajHandler])
 
   let Page = null
   if(applicationId) {
@@ -255,10 +195,6 @@ function MenuApp(props) {
             <Nav.Link eventKey="listeApplications" title={t('menu.listeApplications')}>
                 {t('menu.listeApplications')}
             </Nav.Link>
-
-            {/* <Nav.Link eventKey="categories" title={t('menu.categories')}>
-                {t('menu.categories')}
-            </Nav.Link> */}
 
             <Nav.Link eventKey="information" title="Afficher l'information systeme">
                 {t('menu.information')}
