@@ -3,19 +3,26 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 
 import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
-// import { middlewareRecevoirFichier, middlewareReadyFichier, middlewareDeleteStaging, preparerTransfertBatch } from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
 import FichiersMiddleware from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
-import { ajouterFichierConsignation } from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
+import FichiersTransfertUpstream from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
 
 const debug = debugLib('landing:public')
 
 // Routes publiques
 function routesPubliques(mq) {
     const fichiersMiddleware = new FichiersMiddleware(mq)
+    const fichiersTransfertUpstream = new FichiersTransfertUpstream(mq)
 
     const router = express.Router()
+    
+    router.use((req, res, next)=>{
+      req.fichiersMiddleware = fichiersMiddleware
+      req.fichiersTransfert = fichiersTransfertUpstream
+      next()
+    })
+
     router.get('/token', getToken)
-    router.post('/submit', express.json(), verifierToken, (req, res)=>submitForm(fichiersMiddleware, req, res))
+    router.post('/submit', express.json(), verifierToken, submitForm)
     router.use('/fichiers', verifierToken, routerFichiers(fichiersMiddleware))
     return router
 }
@@ -60,8 +67,10 @@ export async function verifierToken(req, res, next) {
     }
 }
 
-async function submitForm(fichiersMiddleware, req, res) {
-    const mq = req.amqpdao
+async function submitForm(req, res) {
+    const mq = req.amqpdao,
+          fichiersMiddleware = req.fichiersMiddleware,
+          fichiersTransfert = req.fichiersTransfert
     const redisClient = req.redisClient  //amqpdaoInst.pki.redisClient
     const body = req.body
     debug("Submit form req :\n", body)
@@ -107,7 +116,8 @@ async function submitForm(fichiersMiddleware, req, res) {
 
       // Preparer batch fichiers
       if(message.fuuids) {
-        await fichiersMiddleware.preparerTransfertBatch(uuid_transaction)
+        const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
+        await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
       }
 
       // Soumettre la transaction
@@ -120,7 +130,7 @@ async function submitForm(fichiersMiddleware, req, res) {
         .catch(err=>console.error(new Date() + " ERROR submitForm Erreur sauvegarde cle redis submit " + cleRedisSubmit + " : " + err))
   
       // Declencher le transfert de fichiers
-      ajouterFichierConsignation(uuid_transaction)
+      fichiersTransfert.ajouterFichierConsignation(uuid_transaction)
 
       return res.status(201).send({ok: true, uuid_transaction})
     } catch(err) {
