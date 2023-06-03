@@ -1,6 +1,6 @@
 {
   "name": "millegrilles.landing",
-  "version": "2023.3.0",
+  "version": "2023.6.0",
   "description": "Landing pour MilleGrilles",
   "main": "index.js",
   "type": "module",  
@@ -12,8 +12,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@dugrema/millegrilles.nodejs": "https://github.com/dugrema/millegrilles.nodejs.git#2023.3",
-    "@dugrema/millegrilles.utiljs": "https://github.com/dugrema/millegrilles.utiljs.git#2023.3",
+    "@dugrema/millegrilles.nodejs": "https://github.com/dugrema/millegrilles.nodejs.git#2023.6",
+    "@dugrema/millegrilles.utiljs": "https://github.com/dugrema/millegrilles.utiljs.git#2023.6",
     "debug": "~4.3.4",
     "express": "~4.18.2",
     "express-session": "^1.17.3",

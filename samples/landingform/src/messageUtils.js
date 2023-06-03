@@ -3,20 +3,8 @@ import pako from 'pako'
 export async function chiffrerMessage(workers, certifcatsChiffragePem, from, content, opts) {
     opts = opts || {}
 
-    // const {connexion, chiffrage} = workers
     const { chiffrage } = workers
-    const champsOptionnels = ['subject', 'to', ]
-
-    // const toFiltre = to.split(';').map(item=>item.trim())
-    // let ccFiltre = []
-    // if(cc) {
-    //     ccFiltre = cc.split(';').map(item=>item.trim())
-    // }
-    // let bccFiltre = []
-    // if(bcc) {
-    //     bccFiltre = bcc.split(';').map(item=>item.trim())
-    // }
-
+    const champsOptionnels = ['subject', 'to']
     const message = { from, content }
     champsOptionnels.forEach(nomChamp=>{
         if(opts[nomChamp]) message[nomChamp] = opts[nomChamp]
@@ -87,42 +75,19 @@ export async function chiffrerMessage(workers, certifcatsChiffragePem, from, con
 
     // Chiffrer le message 
     const messageChiffre = await chiffrage.chiffrerDocument(
-        messageBytes, 'Messagerie', certifcatsChiffragePem, 
-        {DEBUG: true, identificateurs_document: {'landing': 'true'}, nojson: true, type: 'binary'}
+        messageBytes, 'Landing', certifcatsChiffragePem, 
+        {DEBUG: true, identificateurs_document: {}, nojson: true, type: 'binary'}
     )
-    console.debug("Message chiffre : %O", messageChiffre)
+    // console.debug("Message chiffre : %O", messageChiffre)
 
     const commandeMaitrecles = messageChiffre.commandeMaitrecles
     commandeMaitrecles.partition = commandeMaitrecles['_partition']
     delete commandeMaitrecles['_partition']
+    // commandeMaitrecles.attachements = {partition: commandeMaitrecles['_partition']}
 
-    // const destinataires = [...new Set([...toFiltre, ...ccFiltre, ...bccFiltre])]  // dedupe
+    const dataChiffre = messageChiffre.doc.data_chiffre.slice(1)  // Retirer le premier character multibase (base64)
 
-    // Preparer l'enveloppe du message
-    const enveloppeMessage = {
-        message_chiffre: messageChiffre.doc.data_chiffre,
-        hachage_bytes: commandeMaitrecles['hachage_bytes'],
-        // fingerprint_certificat: messageSigne['en-tete']['fingerprint_certificat'],
-    }
-   
-    // if(attachments) {
-    //     enveloppeMessage.attachments = fuuids
-    // }
-    // if(fuuidAttachmentsTransfert) {
-    //     enveloppeMessage.attachments = fuuidAttachmentsTransfert
-    // }
-
-    // const enveloppeMessageSigne = await connexion.formatterMessage(enveloppeMessage, 'Messagerie')
-    // delete enveloppeMessageSigne['_certificat']
-
-    // const routageMessage = {
-    //     destinataires: destinataires,
-    //     message: enveloppeMessageSigne,
-    // }
-    // if(bcc) routageMessage.bcc = bccFiltre
-
-    // const enveloppeRoutage = await connexion.formatterMessage(
-    //     routageMessage, 'Messagerie', {action: 'poster', ajouterCertificat: true})
-
-    return { enveloppeMessage, commandeMaitrecles /*, fuuids, message */ }
+    // message : contenu compresse (gzip) et chiffre en base64
+    // commandeMaitrecles : information de dechiffrage pour le maitre des cles
+    return { contenu: dataChiffre, commandeMaitrecles }
 }

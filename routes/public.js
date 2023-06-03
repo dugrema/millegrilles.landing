@@ -2,6 +2,7 @@ import debugLib from 'debug'
 import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 
+import { MESSAGE_KINDS } from '@dugrema/millegrilles.utiljs/src/constantes.js'
 import { signerTokenApplication, verifierTokenApplication } from '@dugrema/millegrilles.nodejs/src/jwt.js'
 import FichiersMiddleware from '@dugrema/millegrilles.nodejs/src/fichiersMiddleware.js'
 import FichiersTransfertUpstream from '@dugrema/millegrilles.nodejs/src/fichiersTransfertUpstream.js'
@@ -18,11 +19,15 @@ function routesPubliques(mq) {
     router.use((req, res, next)=>{
       req.fichiersMiddleware = fichiersMiddleware
       req.fichiersTransfert = fichiersTransfertUpstream
+
+      debug("routesPubliques REQ url ", req.url)
+
       next()
     })
 
     router.get('/token', getToken)
-    router.post('/submit', express.json(), verifierToken, submitForm)
+    router.post('/submit', (req, res, next)=>{debug("SUBMIT"); next()}, express.json(), verifierToken, submitForm)
+    router.use('/submit', (req, res, next)=>{debug("SUBMIT 2"); res.sendStatus(400)})
     router.use('/fichiers', verifierToken, routerFichiers(fichiersMiddleware))
     return router
 }
@@ -72,7 +77,8 @@ async function submitForm(req, res) {
           fichiersMiddleware = req.fichiersMiddleware,
           fichiersTransfert = req.fichiersTransfert
     const redisClient = req.redisClient  //amqpdaoInst.pki.redisClient
-    const body = req.body
+    const body = req.body,
+          headers = req.headers
     debug("Submit form req :\n", body)
 
     // Verifier le token JWT
@@ -91,7 +97,7 @@ async function submitForm(req, res) {
       }
       debug("Token Info : ", tokenInfo)
       const { extensions, payload } = tokenInfo
-      if( ! extensions.roles.includes('landing_web') ) return res.status(403).send({ok: false, err: 'Invalid cert role'})
+      if( ! extensions.roles.includes('landing_web') ) return res.status(403).send({ok: false, err: 'Invalid token - cert role not allowed'})
   
       const { application_id, sub: uuid_transaction, exp: expirationToken } = payload
       debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
@@ -108,21 +114,26 @@ async function submitForm(req, res) {
       const infoApplication = await mq.transmettreRequete('Landing', {application_id}, {action: 'getApplication', exchange: '2.prive'})
       debug("Info application ", infoApplication)
       const { actif } = infoApplication
-      if(actif !== true) return res.status(503).send({ok: false, err: 'Application inactive'})
+      if(actif !== true) return res.status(403).send({ok: false, err: 'Application inactive'})
 
       // Creer transaction
-      const transaction = await formatterTransactionMessagerie(mq, infoApplication, uuid_transaction, message)
-      console.debug("Transaction ", transaction)
+      const transaction = await formatterTransactionMessagerie(mq, infoApplication, message, {uuid_transaction, headers})
+      debug("Message usager application ", transaction)
 
       // Preparer batch fichiers
-      if(message.fuuids) {
-        const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
-        await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
-      }
+      // if(message.fuuids) {
+      //   const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
+      //   await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
+      // }
 
+      const attachements = { cle: transaction.cle }
+      delete transaction.cle
       // Soumettre la transaction
-      const reponse = await mq.transmettreCommande('Messagerie', transaction, {action: 'recevoir', ajouterCertificat: true})
-      debug("Reponse recevoir : ", reponse)
+      const reponse = await mq.transmettreCommande(
+        'Messagerie', transaction, 
+        {action: 'notifier', attachements, ajouterCertificat: true, exchange: '1.public'}
+      )
+      debug("Reponse notifier : ", reponse)
 
       // Ajouter cle dans redis pour bloquer reutilisation du token
       const ttl = expirationToken - Math.round(new Date().getTime()/1000) + 1
@@ -130,9 +141,9 @@ async function submitForm(req, res) {
         .catch(err=>console.error(new Date() + " ERROR submitForm Erreur sauvegarde cle redis submit " + cleRedisSubmit + " : " + err))
   
       // Declencher le transfert de fichiers
-      fichiersTransfert.ajouterFichierConsignation(uuid_transaction)
+      //fichiersTransfert.ajouterFichierConsignation(uuid_transaction)
 
-      return res.status(201).send({ok: true, uuid_transaction})
+      return res.status(201).send({ok: true, message_id: transaction.id, uuid_transaction})
     } catch(err) {
       console.error(new Date() + ' ERROR submitForm ', err)
       return res.sendStatus(500)
@@ -140,36 +151,64 @@ async function submitForm(req, res) {
   
 }
 
-async function formatterTransactionMessagerie(mq, infoApplication, uuid_transaction, message) {
-  const { application_id, user_id } = infoApplication
+/**
+ * Genere un message inter-millegrilles (kind:8) avec l'information recue.
+ * @param {*} mq 
+ * @param {*} infoApplication 
+ * @param {*} message 
+ * @param {*} opts 
+ * @returns 
+ */
+async function formatterTransactionMessagerie(mq, infoApplication, message, opts) {
+  opts = opts || {}
 
-  debug("Application Id : %s, uuid_transaction : %s", application_id, uuid_transaction)
+  const { application_id, user_id } = infoApplication
+  const domaine = opts.domaine || 'Messagerie',
+        action = opts.action || 'nouveauMessage'
+
+  debug("Application Id : %s, user_id : %s", application_id, user_id)
+
+  // Preparer information message inter-millegrilles
+  const { commandeMaitrecles, contenu } = message
+  const partition = commandeMaitrecles.partition
+  delete commandeMaitrecles.partition
+  commandeMaitrecles.domaine = domaine  // Override domaine
+  commandeMaitrecles.identificateurs_document = {'landing': 'true'}
+
+  const dechiffrage = {
+      format: commandeMaitrecles.format,
+      header: commandeMaitrecles.header,
+      hachage: commandeMaitrecles['hachage_bytes'],
+  }
 
   // Signer message
-  const { commandeMaitrecles, enveloppeMessage } = message
-  const messageMessagerie = {
-    ...enveloppeMessage,
-    application_id, 
-    fingerprint_certificat: mq.pki.fingerprint,
-  }
   const messageSigne = await mq.pki.formatterMessage(
-    messageMessagerie, 'Landing', 
-    {uuidTransaction: uuid_transaction, ajouterCertificat: true}
+    MESSAGE_KINDS.KIND_COMMANDE_INTER_MILLEGRILLE, contenu, 
+    {domaine, action, dechiffrage, ajouterCertificat: true}
   )
   debug("Message signe : ", messageSigne)
+  commandeMaitrecles.identificateurs_document.message_id = messageSigne.id
+  // Cleanup certificats - ils vont etre ajoutes au besoin dans la commande notifier
+  delete messageSigne.certificat
+  delete messageSigne.millegrille
 
   const commandeMaitreclesSignee = await mq.pki.formatterMessage(
-    commandeMaitrecles, 'MaitreDesCles', 
-    {action: 'sauvegarderCle', ajouterCertificat: true}
+    MESSAGE_KINDS.KIND_COMMANDE, commandeMaitrecles, 
+    {domaine: 'MaitreDesCles', action: 'sauvegarderCle', ajouterCertificat: true}
   )
+  // Attacher partition pour la commande de maitre des cles
+  commandeMaitreclesSignee.attachements = {partition}
 
-  // Generer transaction de messagerie
+  // messageSigne.attachements = {
+  //   'cle': commandeMaitreclesSignee
+  // }
+
   const transaction = {
     message: messageSigne,
-    destinataires: [],  // Aucune adresse destinataire
-    destinataires_user_id: [{user_id}],  // User IDs internes
-    application_id,
-    _cle: commandeMaitreclesSignee,
+    destinataires: [user_id],
+    // expiration: 30 * 86400,
+    // niveau: 'info',
+    cle: commandeMaitreclesSignee,
   }
 
   return transaction

@@ -75,9 +75,8 @@ function AfficherListe(props) {
     return (
         <div>
             <Row>
-                <Col xs={12} md={5} lg={6}>Nom</Col>
-                <Col xs={8} md={6} lg={5}>Application ID</Col>
-                <Col xs={4} md={1} lg={1}>Actif</Col>
+                <Col xs={2} md={1}>Actif</Col>
+                <Col xs={10} md={11}>Nom</Col>
             </Row>
             {liste.map(item=>(<RowApplication key={item.application_id} value={item} applicationSelect={applicationSelect} />))}
         </div>
@@ -89,13 +88,12 @@ function RowApplication(props) {
 
     return (
         <Row>
-            <Col xs={12} md={5} lg={6}>
+            <Col xs={2} md={1}>{value.actif?<i className='fa fa-check'/>:''}</Col>
+            <Col xs={10} md={11}>
                 <Button variant='link' onClick={applicationSelect} value={value.application_id}>
                     {value.nom || value.application_id}
                 </Button>
             </Col>
-            <Col xs={8} md={6} lg={5}>{value.application_id}</Col>
-            <Col xs={4} md={1} lg={1}>{value.actif?<i className='fa fa-check'/>:''}</Col>
         </Row>
     )
 }

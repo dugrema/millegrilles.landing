@@ -34,9 +34,10 @@ export function sauvegarderApplication(socket, params) {
 
 async function transmettreRequete(socket, params, action, opts) {
     opts = opts || {}
-    const entete = params['en-tete'] || {}
-    const domaine = opts.domaine || entete.domaine || DOMAINE_LANDING
-    const partition = opts.partition || entete.partition
+    // const entete = params['en-tete'] || {}
+    const routage = params.routage || {}
+    const domaine = opts.domaine || routage.domaine || DOMAINE_LANDING
+    const partition = opts.partition || routage.partition
     const exchange = opts.exchange || L2Prive
     try {
         verifierMessage(params, domaine, action)
@@ -53,9 +54,10 @@ async function transmettreRequete(socket, params, action, opts) {
 
 async function transmettreCommande(socket, params, action, opts) {
     opts = opts || {}
-    const entete = params['en-tete'] || {}
-    const domaine = opts.domaine || entete.domaine || DOMAINE_LANDING
-    const partition = opts.partition || entete.partition
+    // const entete = params['en-tete'] || {}
+    const routage = params.routage || {}
+    const domaine = opts.domaine || routage.domaine || DOMAINE_LANDING
+    const partition = opts.partition || routage.partition
     const exchange = opts.exchange || L2Prive
     const nowait = opts.nowait
     try {
@@ -74,9 +76,10 @@ async function transmettreCommande(socket, params, action, opts) {
 /* Fonction de verification pour eviter abus de l'API */
 function verifierMessage(message, domaine, action) {
     console.debug("Verifier domaine %s action %s pour %O", domaine, action, message)
-    const entete = message['en-tete'] || {},
-          domaineRecu = entete.domaine,
-          actionRecue = entete.action
+    // const entete = message['en-tete'] || {}
+    const routage = message.routage || {}
+    const domaineRecu = routage.domaine,
+          actionRecue = routage.action
     if(domaineRecu !== domaine) throw new Error(`Mismatch domaine (${domaineRecu} !== ${domaine})"`)
     if(actionRecue !== action) throw new Error(`Mismatch action (${actionRecue} !== ${action})"`)
 }

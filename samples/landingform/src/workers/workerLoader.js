@@ -1,13 +1,12 @@
 import { wrap, releaseProxy } from 'comlink'
 
-const FICHE_URL = 'https://mg-dev1.maple.maceroc.com/fiche.json'
-
 class ConfigDao {
   constructor(chiffrage) {
     this.chiffrage = chiffrage
 
     this.config = null
     this.fiche = null
+    this.contenuFiche = null
     this.location = null
   }
   
@@ -20,22 +19,27 @@ class ConfigDao {
     if(!this.location) throw new Error('config non initialisee ou invalide')
     const fiche = await loadFiche(this.location.href)
     this.fiche = fiche
+    this.contenuFiche = JSON.parse(fiche.contenu)
     return this.fiche
   }
 
   getClesChiffrage() {
-    return this.fiche.chiffrage
+    return this.contenuFiche.chiffrage
   }
 
   getConfig() {
     return this.config
   }
 
+  getContenuFiche() {
+    return this.contenuFiche || {}
+  }
+
   getUrlsApplication() {
     let urlLocal = null
     const hostnameLocal = window.location.hostname
     
-    const appUrls = this.fiche.applications.landing_web
+    const appUrls = this.contenuFiche.applications.landing_web
       .filter(item=>item.nature === 'dns')
       .map(item=>{
         const url = new URL(item.url)
@@ -47,6 +51,11 @@ class ConfigDao {
     if(urlLocal) return [urlLocal]
 
     return appUrls
+  }
+
+  clear() {
+    this.fiche = null
+    this.contenuFiche = null
   }
 }
 
@@ -72,14 +81,15 @@ export function setupWorkers() {
     .then(async config=>{
       configDao.setConfig(config)
       const fiche = await configDao.reload()
-      const ca = fiche.ca || fiche['_millegrille']
+      const contenuFiche = configDao.getContenuFiche()
+      const ca = contenuFiche.ca || fiche['millegrille']
       if(ca) {
         await chiffrage.proxy.init(ca)  // x509client
         await chiffrage.proxy.initialiserCertificateStore(ca, {isPEM: true, DEBUG: false})  // chiffrage
         
         // Valider message
         const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
-        if(config.idmg && config.idmg != idmgCalcule) throw new Error("IDMG mismatch")
+        if(contenuFiche.idmg && contenuFiche.idmg !== idmgCalcule) throw new Error("IDMG mismatch")
         const resultat = await chiffrage.proxy.verifierMessage(fiche)
         console.debug("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
       } else {
@@ -90,6 +100,7 @@ export function setupWorkers() {
     })
     .catch(err=>{
       console.error("Erreur chargement config / fiche / chiffrage worker ", err)
+      configDao.clear()
     })
   
   return { workerInstances, workers, ready: configPromise }
@@ -103,7 +114,7 @@ async function loadConfiguration() {
     const axios = axiosImport.default
     const reponse = await axios.get(location.href)
     const config = reponse.data || {}
-    // console.debug("Configuration chargee ", config)
+    console.debug("Configuration chargee ", config)
     return config
   } catch(err) {
     console.error("Erreur chargement fiche systeme : %O", err)
@@ -116,6 +127,7 @@ async function loadFiche(urlFiche) {
     const axios = axiosImport.default
     const reponse = await axios.get(urlFiche)
     const fiche = reponse.data || {}
+    console.debug("loadFiche ", fiche)
     return fiche
   } catch(err) {
     console.error("Erreur chargement fiche systeme : %O", err)

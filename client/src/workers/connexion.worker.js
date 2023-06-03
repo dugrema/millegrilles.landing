@@ -1,5 +1,6 @@
 import { expose } from 'comlink'
 import * as ConnexionClient from '@dugrema/millegrilles.reactjs/src/connexionClient'
+import { MESSAGE_KINDS } from '@dugrema/millegrilles.utiljs/src/constantes'
 
 const CONST_DOMAINE_LANDING = 'Landing'
 
@@ -9,6 +10,7 @@ function getListeApplications(requete) {
     'getListeApplications', 
     requete, 
     {
+      kind: MESSAGE_KINDS.KIND_REQUETE, 
       domaine: CONST_DOMAINE_LANDING, 
       action: 'getListeApplications', 
       ajouterCertificat: true,
@@ -21,6 +23,7 @@ function getApplication(applicationId) {
     'getApplication', 
     {application_id: applicationId}, 
     {
+      kind: MESSAGE_KINDS.KIND_REQUETE, 
       domaine: CONST_DOMAINE_LANDING, 
       action: 'getApplication', 
       ajouterCertificat: true,
@@ -33,6 +36,7 @@ function creerNouvelleApplication() {
     'creerNouvelleApplication', 
     {}, 
     {
+      kind: MESSAGE_KINDS.KIND_COMMANDE, 
       domaine: CONST_DOMAINE_LANDING, 
       action: 'creerNouvelleApplication', 
       ajouterCertificat: true,
@@ -45,6 +49,7 @@ function sauvegarderApplication(application) {
     'sauvegarderApplication', 
     application, 
     {
+      kind: MESSAGE_KINDS.KIND_COMMANDE, 
       domaine: CONST_DOMAINE_LANDING, 
       action: 'sauvegarderApplication', 
       ajouterCertificat: true,
