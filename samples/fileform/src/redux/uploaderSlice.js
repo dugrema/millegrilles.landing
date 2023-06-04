@@ -421,6 +421,7 @@ async function uploadFichier(workers, dispatch, fichier, cancelToken) {
     console.debug("uploadFichier Info fichiers uploade ", fichier)
     const infoGrosFichiers = fichier.transactionGrosfichiers,
           hachage = infoGrosFichiers.fuuid
+    // await transfertFichiers.confirmerUpload(token, correlation, {hachage, transaction: infoGrosFichiers, cle: fichier.cle})
     await transfertFichiers.confirmerUpload(token, correlation, {hachage})
 
     // Upload complete, dispatch nouvel etat

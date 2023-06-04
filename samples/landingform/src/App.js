@@ -64,12 +64,12 @@ function LayoutMain(props) {
         <p>Etat pret : {etatPret?'Oui':'Non'}</p>
         <div>
           <div>Token session</div>
-          <div style={{'fontSize': 'x-small'}}>{token.replaceAll('\.', '\. ')}</div>
+          <div style={{'fontSize': 'x-small'}}>{token.token.replaceAll('\.', '\. ')}</div>
         </div>
       </Alert>
 
       <FormApplication 
-        token={token}
+        token={token.token}
         resetToken={resetTokenHandler} />
 
     </Container>

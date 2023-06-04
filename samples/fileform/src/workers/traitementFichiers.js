@@ -33,15 +33,17 @@ async function traiterAcceptedFiles(workers, dispatch, params, opts) {
     const { transfertFichiers } = workers
     console.debug("traiterAcceptedFiles Debut pour batchId %s, fichiers %O", batchId, acceptedFiles)
 
-    const certificatsMaitredescles = await workers.config.getClesChiffrage()
-    await transfertFichiers.up_setCertificats(certificatsMaitredescles)
-    console.debug("Certificat maitre des cles OK")
+    // const certificatsMaitredescles = await workers.config.getClesChiffrage()
+    // await transfertFichiers.up_setCertificats(certificatsMaitredescles)
+    // console.debug("Certificat maitre des cles OK")
 
     const ajouterPartProxy = Comlink.proxy(
         (correlation, compteurPosition, chunk) => ajouterPart(workers, batchId, correlation, compteurPosition, chunk)
     )
     const updateFichierProxy = Comlink.proxy((doc, opts) => {
+        console.debug("updateFichierProxy doc recu : ", doc)
         const docWithIds = {...doc, batchId}
+        console.debug("updateFichierProxy Conserver ", docWithIds)
         return updateFichier(workers, dispatch, docWithIds, opts)
     })
     const setProgresProxy = setProgres?Comlink.proxy(setProgres):null

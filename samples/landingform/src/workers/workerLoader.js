@@ -1,63 +1,65 @@
 import { wrap, releaseProxy } from 'comlink'
 
-class ConfigDao {
-  constructor(chiffrage) {
-    this.chiffrage = chiffrage
+import { loadConfiguration, ConfigDao } from '@dugrema/millegrilles.reactjs/src/landing.js'
 
-    this.config = null
-    this.fiche = null
-    this.contenuFiche = null
-    this.location = null
-  }
+// class ConfigDao {
+//   constructor(chiffrage) {
+//     this.chiffrage = chiffrage
+
+//     this.config = null
+//     this.fiche = null
+//     this.contenuFiche = null
+//     this.location = null
+//   }
   
-  setConfig(config) {
-    this.config = config
-    this.location = new URL(config.fiche_url)
-  }
+//   setConfig(config) {
+//     this.config = config
+//     this.location = new URL(config.fiche_url)
+//   }
   
-  async reload() {
-    if(!this.location) throw new Error('config non initialisee ou invalide')
-    const fiche = await loadFiche(this.location.href)
-    this.fiche = fiche
-    this.contenuFiche = JSON.parse(fiche.contenu)
-    return this.fiche
-  }
+//   async reload() {
+//     if(!this.location) throw new Error('config non initialisee ou invalide')
+//     const fiche = await loadFiche(this.location.href)
+//     this.fiche = fiche
+//     this.contenuFiche = JSON.parse(fiche.contenu)
+//     return this.fiche
+//   }
 
-  getClesChiffrage() {
-    return this.contenuFiche.chiffrage
-  }
+//   getClesChiffrage() {
+//     return this.contenuFiche.chiffrage
+//   }
 
-  getConfig() {
-    return this.config
-  }
+//   getConfig() {
+//     return this.config
+//   }
 
-  getContenuFiche() {
-    return this.contenuFiche || {}
-  }
+//   getContenuFiche() {
+//     return this.contenuFiche || {}
+//   }
 
-  getUrlsApplication() {
-    let urlLocal = null
-    const hostnameLocal = window.location.hostname
+//   getUrlsApplication() {
+//     let urlLocal = null
+//     const hostnameLocal = window.location.hostname
     
-    const appUrls = this.contenuFiche.applications.landing_web
-      .filter(item=>item.nature === 'dns')
-      .map(item=>{
-        const url = new URL(item.url)
-        if(url.hostname === hostnameLocal) urlLocal = url  // Conserver lien vers hostname courant
-        return url
-      })
+//     const appUrls = this.contenuFiche.applications.landing_web
+//       .filter(item=>item.nature === 'dns')
+//       .map(item=>{
+//         const url = new URL(item.url)
+//         if(url.hostname === hostnameLocal) urlLocal = url  // Conserver lien vers hostname courant
+//         return url
+//       })
 
-    // Retourner url de l'application courante de preference
-    if(urlLocal) return [urlLocal]
+//     // Retourner url de l'application courante de preference
+//     if(urlLocal) return [urlLocal]
 
-    return appUrls
-  }
+//     return appUrls
+//   }
 
-  clear() {
-    this.fiche = null
-    this.contenuFiche = null
-  }
-}
+//   clear() {
+//     this.fiche = null
+//     this.contenuFiche = null
+//   }
+// }
 
 // Exemple de loader pour web workers
 export function setupWorkers() {
@@ -106,33 +108,33 @@ export function setupWorkers() {
   return { workerInstances, workers, ready: configPromise }
 }
 
-async function loadConfiguration() {
-  try {
-    const location = new URL(window.location.href)
-    location.pathname = location.pathname + '/config.json'
-    const axiosImport = await import('axios')
-    const axios = axiosImport.default
-    const reponse = await axios.get(location.href)
-    const config = reponse.data || {}
-    console.info("Configuration chargee ", config)
-    return config
-  } catch(err) {
-    console.error("Erreur chargement fiche systeme : %O", err)
-  }
-}
+// async function loadConfiguration() {
+//   try {
+//     const location = new URL(window.location.href)
+//     location.pathname = location.pathname + '/config.json'
+//     const axiosImport = await import('axios')
+//     const axios = axiosImport.default
+//     const reponse = await axios.get(location.href)
+//     const config = reponse.data || {}
+//     console.info("Configuration chargee ", config)
+//     return config
+//   } catch(err) {
+//     console.error("Erreur chargement fiche systeme : %O", err)
+//   }
+// }
 
-async function loadFiche(urlFiche) {
-  try {
-    const axiosImport = await import('axios')
-    const axios = axiosImport.default
-    const reponse = await axios.get(urlFiche)
-    const fiche = reponse.data || {}
-    // console.debug("loadFiche ", fiche)
-    return fiche
-  } catch(err) {
-    console.error("Erreur chargement fiche systeme : %O", err)
-  }
-}
+// async function loadFiche(urlFiche) {
+//   try {
+//     const axiosImport = await import('axios')
+//     const axios = axiosImport.default
+//     const reponse = await axios.get(urlFiche)
+//     const fiche = reponse.data || {}
+//     // console.debug("loadFiche ", fiche)
+//     return fiche
+//   } catch(err) {
+//     console.error("Erreur chargement fiche systeme : %O", err)
+//   }
+// }
 
 function wrapWorker(worker) {
   const proxy = wrap(worker)

@@ -2,6 +2,8 @@ import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'rea
 import { proxy as comlinkProxy } from 'comlink'
 import { useSelector, useDispatch } from 'react-redux'
 
+import { getToken, submitHtmlForm } from '@dugrema/millegrilles.reactjs/src/landing.js'
+
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
@@ -11,7 +13,7 @@ import Alert from 'react-bootstrap/Alert'
 
 import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
-import { chiffrerMessage } from './messageUtils'
+// import { chiffrerMessage } from './messageUtils'
 import { setToken, clearToken } from './redux/uploaderSlice'
 import { chargerUploads } from './redux/uploaderIdbDao'
 
@@ -57,8 +59,10 @@ function LayoutMain(props) {
 
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
-    getToken(urlConnexion, config.application_id)
+    // getToken(urlConnexion, config.application_id)
+    getToken(config, {urlConnexion})
       .then(data=>{
+        console.debug("Token data ", data)
         dispatch(setToken({token: data.token, batchId: data.uuid_transaction}))
         // dispatch() // TODO Set correlation Id
       })
@@ -127,12 +131,7 @@ function FormApplication(props) {
     preparerFichiersBatch(batchId)
       .then(async fichiers => {
         console.debug("Fichiers : ", fichiers)
-        const contenu = `
-        <h2>Application Sample Form</h2>
-        <p>---</p>
-        <p>Champ 1 : ${champ1}</p>
-        <p>---</p>
-        `
+        const contenu = formatterMessage(champ1)
         const certificats = workers.config.getClesChiffrage()
         console.debug("Submit %O, certificats %O", contenu, certificats)
         const r = await submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id, fichiers})
@@ -140,7 +139,7 @@ function FormApplication(props) {
         dispatch(clearToken())
       })
       .catch(err=>console.error("Erreur submit form ", err))
-  }, [dispatch, urlConnexion, workers, config, champ1, token])
+  }, [dispatch, batchId, urlConnexion, workers, config, champ1, token])
 
   return (
     <div>
@@ -181,57 +180,67 @@ function FormApplication(props) {
   )
 }
 
-async function getToken(urlConnexion, application_id) {
-    // Generer nouveau token
-    const urlToken = new URL(urlConnexion)
-    urlToken.pathname = urlToken.pathname + '/public/token'
-    urlToken.searchParams.set('application_id', application_id)
+function formatterMessage(champ1) {
+  const contenu = `
+  <h2>Application Sample File Form</h2>
+  <p>---</p>
+  <p>Champ 1 : ${champ1}</p>
+  <p>---</p>
+  `
 
-    const axiosImport = await import('axios')
-    const reponse = await axiosImport.default.get(urlToken.href)
-    const data = reponse.data
-    console.debug("Reponse token ", data)
-    return data
-    //const token = data.token
-    //return token
+  return contenu
 }
 
 async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
   opts = opts || {}
-  const application_id = opts.application_id
+  const { application_id, fichiers } = opts
 
-  const from = 'Landing page'
-  const subject = 'Sample Form ' + new Date()
-  const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
-  if(opts.fichiers) optionsMessage.files = opts.fichiers
+  const from = 'Landing page files'
+  const subject = 'File Form ' + new Date().toLocaleString()
+  const reponse = await submitHtmlForm(
+    workers, application_id, contenu, token, certifcatsChiffragePem, {urlConnexion, from, subject, fichiers})
 
-  const headerContenu = `
-  <p>--- HEADER ---</p>
-  <div class='header'>
-    <p>Application Id : ${application_id}</p>
-    <p>Date client : ${''+new Date()}</p>
-  </div>
-  <p>--- FIN HEADER ---</p>
-  <p> </p>
-  `
-  const contenuAvecHeader = headerContenu + contenu
+  console.debug("Reponse submit : ", reponse)
 
-  const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenuAvecHeader, optionsMessage)
-  console.debug("Message chiffre : ", messageChiffre)
-
-  const axiosImport = await import('axios')
-
-  const url = new URL(urlConnexion)
-  url.pathname = url.pathname + '/public/submit'
-
-  const reponse = await axiosImport.default({
-    method: 'POST',
-    url: url.href,
-    data: {message: messageChiffre, token},
-  })
-
-  return reponse.data
+  return reponse
 }
+
+// async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
+//   opts = opts || {}
+//   const application_id = opts.application_id
+
+//   const from = 'Landing page'
+//   const subject = 'Sample Form ' + new Date()
+//   const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
+//   if(opts.fichiers) optionsMessage.files = opts.fichiers
+
+//   const headerContenu = `
+//   <p>--- HEADER ---</p>
+//   <div class='header'>
+//     <p>Application Id : ${application_id}</p>
+//     <p>Date client : ${''+new Date()}</p>
+//   </div>
+//   <p>--- FIN HEADER ---</p>
+//   <p> </p>
+//   `
+//   const contenuAvecHeader = headerContenu + contenu
+
+//   const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenuAvecHeader, optionsMessage)
+//   console.debug("Message chiffre : ", messageChiffre)
+
+//   const axiosImport = await import('axios')
+
+//   const url = new URL(urlConnexion)
+//   url.pathname = url.pathname + '/public/submit'
+
+//   const reponse = await axiosImport.default({
+//     method: 'POST',
+//     url: url.href,
+//     data: {message: messageChiffre, token},
+//   })
+
+//   return reponse.data
+// }
 
 function BoutonUpload(props) {
 
@@ -326,20 +335,36 @@ async function preparerFichiersBatch(batchId) {
   const uploads = await chargerUploads(batchId)
   if(uploads.length === 0) return null
 
+  const nowEpoch = Math.floor(new Date().getTime() / 1000)
+
   const mapping = []
   for await (let item of uploads) {
     console.debug("preparerFichiersBatch Mapper ", item)
     const transaction = item.transactionGrosfichiers
     const mimetype = transaction.mimetype,
-          fuuid = transaction.fuuid
+          fuuid = transaction.fuuid,
+          cle = item.cle
 
     const fichier = {
-      fuuid,
+      name: item.nom,
+      date: nowEpoch,
+      size: item.taille,
+      digest: fuuid,
+      file: fuuid,
+      encrypted_size: item.taille_chiffree,
       mimetype,
-      taille: item.taille,
-      taille_chiffree: item.taille_chiffree,
-      metadata: { ...item.metadataDechiffre },
-      cle: item.cle,
+      decryption: {
+        key: cle.cleSecrete,
+        header: cle.header, 
+        format: cle.format,
+      }
+
+      // fuuid,
+      // mimetype,
+      // taille: item.taille,
+      // taille_chiffree: item.taille_chiffree,
+      // metadata: { ...item.metadataDechiffre },
+      // cle: item.cle,
     }
     mapping.push(fichier)
   }

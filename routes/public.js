@@ -11,8 +11,11 @@ const debug = debugLib('landing:public')
 
 // Routes publiques
 function routesPubliques(mq) {
-    const fichiersMiddleware = new FichiersMiddleware(mq)
-    const fichiersTransfertUpstream = new FichiersTransfertUpstream(mq)
+ 
+    const PATH_STAGING = process.env.PATH_STAGING || '/var/opt/millegrilles/consignation/staging/landing'
+
+    const fichiersMiddleware = new FichiersMiddleware(mq, {PATH_STAGING})
+    const fichiersTransfertUpstream = new FichiersTransfertUpstream(mq, {PATH_STAGING})
 
     const router = express.Router()
     
@@ -26,8 +29,7 @@ function routesPubliques(mq) {
     })
 
     router.get('/token', getToken)
-    router.post('/submit', (req, res, next)=>{debug("SUBMIT"); next()}, express.json(), verifierToken, submitForm)
-    router.use('/submit', (req, res, next)=>{debug("SUBMIT 2"); res.sendStatus(400)})
+    router.post('/submit', express.json(), verifierToken, submitForm)
     router.use('/fichiers', verifierToken, routerFichiers(fichiersMiddleware))
     return router
 }
@@ -121,10 +123,11 @@ async function submitForm(req, res) {
       debug("Message usager application ", transaction)
 
       // Preparer batch fichiers
-      // if(message.fuuids) {
-      //   const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
-      //   await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
-      // }
+      //if(message.inclure_fichiers === true) {
+        debug("submitForm Uploader fichiers")
+        const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
+        await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
+      //}
 
       const attachements = { cle: transaction.cle }
       delete transaction.cle
@@ -219,11 +222,21 @@ function routerFichiers(fichiersMiddleware) {
   const router = express.Router()
 
   router.put('/:correlation/:position', fichiersMiddleware.middlewareRecevoirFichier())
-  router.post('/:correlation', express.json(), fichiersMiddleware.middlewareReadyFichier())
+  router.post('/:correlation', 
+    express.json(), 
+    fichiersMiddleware.middlewareReadyFichier({signerCommandes: true, passthroughOnSuccess: true}),
+    fichierReadyOk
+  )
 
   const deleteHandler = fichiersMiddleware.middlewareDeleteStaging()
   router.delete('/:correlation', deleteHandler)
   router.delete(deleteHandler)
 
   return router
+}
+
+function fichierReadyOk(req, res) {
+  // res.setHeader('access-control-allow-origin', '*')
+  res.status(200)
+  res.send({ok: true})
 }

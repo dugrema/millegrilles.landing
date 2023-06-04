@@ -1,55 +1,9 @@
 import { wrap, releaseProxy } from 'comlink'
 
+import { loadConfiguration, ConfigDao } from '@dugrema/millegrilles.reactjs/src/landing.js'
+
 import * as uploadFichiersDao from '../redux/uploaderIdbDao'
 import setupTraitementFichiers from './traitementFichiers'
-
-class ConfigDao {
-  constructor(chiffrage) {
-    this.chiffrage = chiffrage
-
-    this.config = null
-    this.fiche = null
-    this.location = null
-  }
-  
-  setConfig(config) {
-    this.config = config
-    this.location = new URL(config.fiche_url)
-  }
-  
-  async reload() {
-    if(!this.location) throw new Error('config non initialisee ou invalide')
-    const fiche = await loadFiche(this.location.href)
-    this.fiche = fiche
-    return this.fiche
-  }
-
-  getClesChiffrage() {
-    return this.fiche.chiffrage
-  }
-
-  getConfig() {
-    return this.config
-  }
-
-  getUrlsApplication() {
-    let urlLocal = null
-    const hostnameLocal = window.location.hostname
-    
-    const appUrls = this.fiche.applications.landing_web
-      .filter(item=>item.nature === 'dns')
-      .map(item=>{
-        const url = new URL(item.url)
-        if(url.hostname === hostnameLocal) urlLocal = url  // Conserver lien vers hostname courant
-        return url
-      })
-
-    // Retourner url de l'application courante de preference
-    if(urlLocal) return [urlLocal]
-
-    return appUrls
-  }
-}
 
 // Exemple de loader pour web workers
 export function setupWorkers() {
@@ -73,21 +27,46 @@ export function setupWorkers() {
   workers.uploadFichiersDao = uploadFichiersDao      // IDB upload fichiers
   workers.traitementFichiers = setupTraitementFichiers(workers) // Upload et download
 
+  // const configPromise = loadConfiguration()
+  //   .then(async config=>{
+  //     configDao.setConfig(config)
+  //     const fiche = await configDao.reload()
+  //     const ca = fiche.ca || fiche['millegrille']
+  //     if(ca) {
+  //       await chiffrage.proxy.init(ca)  // x509client
+  //       await chiffrage.proxy.initialiserCertificateStore(ca, {isPEM: true, DEBUG: false})  // chiffrage
+  //       // await transfertFichiers.proxy.up_setCertificatCa(ca)  //  Note : pas necessaire, cles secrets chiffrages via contenu message
+
+  //       // Valider message
+  //       const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
+  //       if(config.idmg && config.idmg != idmgCalcule) throw new Error("IDMG mismatch")
+  //       const resultat = await chiffrage.proxy.verifierMessage(fiche)
+  //       console.debug("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
+  //     } else {
+  //       throw new Error("Certificat CA manquant de la fiche")
+  //     }
+
+  //     return true
+  //   })
+  //   .catch(err=>{
+  //     console.error("Erreur chargement config / fiche / chiffrage worker ", err)
+  //   })
+  
   const configPromise = loadConfiguration()
     .then(async config=>{
       configDao.setConfig(config)
       const fiche = await configDao.reload()
-      const ca = fiche.ca || fiche['_millegrille']
+      const contenuFiche = configDao.getContenuFiche()
+      const ca = contenuFiche.ca || fiche['millegrille']
       if(ca) {
         await chiffrage.proxy.init(ca)  // x509client
         await chiffrage.proxy.initialiserCertificateStore(ca, {isPEM: true, DEBUG: false})  // chiffrage
-        // await transfertFichiers.proxy.up_setCertificatCa(ca)  //  Note : pas necessaire, cles secrets chiffrages via contenu message
-
+        
         // Valider message
         const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
-        if(config.idmg && config.idmg != idmgCalcule) throw new Error("IDMG mismatch")
+        if(contenuFiche.idmg && contenuFiche.idmg !== idmgCalcule) throw new Error("IDMG mismatch")
         const resultat = await chiffrage.proxy.verifierMessage(fiche)
-        console.debug("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
+        console.info("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
       } else {
         throw new Error("Certificat CA manquant de la fiche")
       }
@@ -96,36 +75,11 @@ export function setupWorkers() {
     })
     .catch(err=>{
       console.error("Erreur chargement config / fiche / chiffrage worker ", err)
+      configDao.clear()
     })
   
+
   return { workerInstances, workers, ready: configPromise }
-}
-
-async function loadConfiguration() {
-  try {
-    const location = new URL(window.location.href)
-    location.pathname = location.pathname + '/config.json'
-    const axiosImport = await import('axios')
-    const axios = axiosImport.default
-    const reponse = await axios.get(location.href)
-    const config = reponse.data || {}
-    // console.debug("Configuration chargee ", config)
-    return config
-  } catch(err) {
-    console.error("Erreur chargement fiche systeme : %O", err)
-  }
-}
-
-async function loadFiche(urlFiche) {
-  try {
-    const axiosImport = await import('axios')
-    const axios = axiosImport.default
-    const reponse = await axios.get(urlFiche)
-    const fiche = reponse.data || {}
-    return fiche
-  } catch(err) {
-    console.error("Erreur chargement fiche systeme : %O", err)
-  }
 }
 
 function wrapWorker(worker) {

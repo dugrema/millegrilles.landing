@@ -2,7 +2,8 @@ FROM docker.maceroc.com/millegrilles_webappbase:2023.2.0
 
 ENV APP_FOLDER=/usr/src/app \
     NODE_ENV=production \
-    PORT=443
+    PORT=443, \
+    PATH_STAGING=/var/opt/millegrilles/consignation/staging/landing
 
 EXPOSE 80 443
 
