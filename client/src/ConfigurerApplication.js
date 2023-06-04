@@ -5,18 +5,30 @@ import Col from 'react-bootstrap/Col'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 
-import useWorkers, { useEtatPret } from './WorkerContext'
+import useWorkers, { useEtatPret, useInfoConnexion } from './WorkerContext'
 
 function ConfigurerApplication(props) {
     const { applicationId, setApplicationId } = props
 
     const workers = useWorkers(),
-          etatPret = useEtatPret()
+          etatPret = useEtatPret(),
+          infoConnexion = useInfoConnexion()
 
     const [application, setApplication] = useState('')
 
     const nom = useMemo(()=>application.nom || '', [application])
     const actif = useMemo(()=>application.actif || '', [application])
+
+    const configFichier = useMemo(()=>{
+        const urlFiche = new URL(window.location.href)
+        urlFiche.pathname = '/fiche.json'
+        const config = {
+            application_id: application.application_id,
+            fiche_url: urlFiche.href,
+            idmg: infoConnexion.idmg,
+        }
+        return JSON.stringify(config, null, 2)
+    }, [application])
 
     const fermerHandler = useCallback(()=>setApplicationId(''), [setApplicationId])
     const nomChangeHandler = useCallback(e=>{
@@ -99,6 +111,15 @@ function ConfigurerApplication(props) {
                     <Button variant="secondary" onClick={fermerHandler}>Annuler</Button>
                 </Col>
             </Row>
+
+            <p></p>
+
+            <h3>Configuration</h3>
+
+            <p>Fichier config.json : copier ce fichier dans le repertoire /public de l'application deployee.</p>
+
+            <pre>{configFichier}</pre>
+
         </div>
     )
 }
