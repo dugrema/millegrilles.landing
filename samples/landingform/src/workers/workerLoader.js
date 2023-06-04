@@ -91,7 +91,7 @@ export function setupWorkers() {
         const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
         if(contenuFiche.idmg && contenuFiche.idmg !== idmgCalcule) throw new Error("IDMG mismatch")
         const resultat = await chiffrage.proxy.verifierMessage(fiche)
-        console.debug("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
+        console.info("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
       } else {
         throw new Error("Certificat CA manquant de la fiche")
       }
@@ -114,7 +114,7 @@ async function loadConfiguration() {
     const axios = axiosImport.default
     const reponse = await axios.get(location.href)
     const config = reponse.data || {}
-    console.debug("Configuration chargee ", config)
+    console.info("Configuration chargee ", config)
     return config
   } catch(err) {
     console.error("Erreur chargement fiche systeme : %O", err)
@@ -127,7 +127,7 @@ async function loadFiche(urlFiche) {
     const axios = axiosImport.default
     const reponse = await axios.get(urlFiche)
     const fiche = reponse.data || {}
-    console.debug("loadFiche ", fiche)
+    // console.debug("loadFiche ", fiche)
     return fiche
   } catch(err) {
     console.error("Erreur chargement fiche systeme : %O", err)

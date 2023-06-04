@@ -7,9 +7,10 @@ import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import Alert from 'react-bootstrap/Alert'
 
+import { getToken, submitHtmlForm } from '@dugrema/millegrilles.reactjs/src/landing.js'
+
 import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
-import { chiffrerMessage } from './messageUtils'
 
 // Importer JS global
 import 'react-bootstrap/dist/react-bootstrap.min.js'
@@ -37,7 +38,6 @@ export default App
 
 function LayoutMain(props) {
 
-  const workers = useWorkers()
   const etatPret = useEtatPret()
   const urlConnexion = useUrlConnexion()
   const config = useConfig()
@@ -48,7 +48,8 @@ function LayoutMain(props) {
 
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
-    getToken(urlConnexion, config.application_id)
+    console.debug("url connexion : ", urlConnexion)
+    getToken(config, {urlConnexion})
       .then(setToken)
       .catch(err=>console.error("Erreur chargement token ", err))
   }, [config, urlConnexion, token, setToken])
@@ -95,15 +96,10 @@ function FormApplication(props) {
     e.preventDefault()
     e.stopPropagation()
 
-    const contenu = `
-    <h2>Application Sample Form</h2>
-    <p>---</p>
-    <p>Champ 1 : ${champ1}</p>
-    <p>---</p>
-    `
+    const contenuHtml = formatterMessage(champ1)
     const certificats = workers.config.getClesChiffrage()
-    console.debug("Submit %O, certificats %O", contenu, certificats)
-    submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id})
+    console.debug("Submit %O, certificats %O", contenuHtml, certificats)
+    submitForm(urlConnexion, workers, contenuHtml, token, certificats, {application_id: config.application_id})
       .then(r=>{
         console.debug("Reponse submit ", r)
         resetToken()
@@ -133,18 +129,15 @@ function FormApplication(props) {
   )
 }
 
-async function getToken(urlConnexion, application_id) {
-    // Generer nouveau token
-    const urlToken = new URL(urlConnexion)
-    urlToken.pathname = urlToken.pathname + '/public/token'
-    urlToken.searchParams.set('application_id', application_id)
+function formatterMessage(champ1) {
+  const contenu = `
+  <h2>Application Sample Form</h2>
+  <p>---</p>
+  <p>Champ 1 : ${champ1}</p>
+  <p>---</p>
+  `
 
-    const axiosImport = await import('axios')
-    const reponse = await axiosImport.default.get(urlToken.href)
-    const data = reponse.data
-    console.debug("Reponse token ", data)
-    const token = data.token
-    return token
+  return contenu
 }
 
 async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
@@ -152,33 +145,11 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   const application_id = opts.application_id
 
   const from = 'Landing page'
-  const subject = 'Sample Form ' + new Date()
-  const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
+  const subject = 'Sample Form ' + new Date().toLocaleString()
+  const reponse = await submitHtmlForm(
+    workers, application_id, contenu, token, certifcatsChiffragePem, {urlConnexion, from, subject})
 
-  const headerContenu = `
-  <p>--- HEADER ---</p>
-  <div class='header'>
-    <p>Application Id : ${application_id}</p>
-    <p>Date client : ${''+new Date()}</p>
-  </div>
-  <p>--- FIN HEADER ---</p>
-  <p> </p>
-  `
-  const contenuAvecHeader = headerContenu + contenu
+  console.debug("Reponse submit : ", reponse)
 
-  const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenuAvecHeader, optionsMessage)
-  console.debug("Message chiffre : ", messageChiffre)
-
-  const axiosImport = await import('axios')
-
-  const url = new URL(urlConnexion)
-  url.pathname = url.pathname + '/public/submit'
-
-  const reponse = await axiosImport.default({
-    method: 'POST',
-    url: url.href,
-    data: {message: messageChiffre, token},
-  })
-
-  return reponse.data
+  return reponse
 }

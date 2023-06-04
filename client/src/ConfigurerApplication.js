@@ -76,7 +76,7 @@ function ConfigurerApplication(props) {
         <div>
             <Row>
                 <Col>
-                    <h3>Configurer {application.nom || application.application_id}</h3>
+                    <h3>Configurer l'application</h3>
                 </Col>
                 <Col xs={2} md={1}>
                     <Button variant="secondary" onClick={fermerHandler}>X</Button>
