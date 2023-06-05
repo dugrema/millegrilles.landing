@@ -123,11 +123,20 @@ async function submitForm(req, res) {
       debug("Message usager application ", transaction)
 
       // Preparer batch fichiers
-      //if(message.inclure_fichiers === true) {
-        debug("submitForm Uploader fichiers")
-        const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
-        await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
-      //}
+      let fichiersPresents = false
+      try {
+          debug("submitForm Uploader fichiers")
+          const pathSource = fichiersMiddleware.getPathBatch(uuid_transaction)
+          await fichiersTransfert.takeTransfertBatch(uuid_transaction, pathSource)
+          fichiersPresents = true
+      } catch(err) {
+        if(err.code === 'ENOENT') {
+          debug("Aucuns fichiers a uploader")
+        } else {
+          // Autre erreur
+          throw err
+        }
+      }
 
       const attachements = { cle: transaction.cle }
       delete transaction.cle
@@ -144,7 +153,10 @@ async function submitForm(req, res) {
         .catch(err=>console.error(new Date() + " ERROR submitForm Erreur sauvegarde cle redis submit " + cleRedisSubmit + " : " + err))
   
       // Declencher le transfert de fichiers
-      //fichiersTransfert.ajouterFichierConsignation(uuid_transaction)
+      if(fichiersPresents) {
+        debug("Debut transfert fichiers")
+        fichiersTransfert.ajouterFichierConsignation(uuid_transaction)
+      }
 
       return res.status(201).send({ok: true, message_id: transaction.id, uuid_transaction})
     } catch(err) {

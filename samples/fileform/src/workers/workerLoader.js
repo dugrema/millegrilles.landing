@@ -27,31 +27,6 @@ export function setupWorkers() {
   workers.uploadFichiersDao = uploadFichiersDao      // IDB upload fichiers
   workers.traitementFichiers = setupTraitementFichiers(workers) // Upload et download
 
-  // const configPromise = loadConfiguration()
-  //   .then(async config=>{
-  //     configDao.setConfig(config)
-  //     const fiche = await configDao.reload()
-  //     const ca = fiche.ca || fiche['millegrille']
-  //     if(ca) {
-  //       await chiffrage.proxy.init(ca)  // x509client
-  //       await chiffrage.proxy.initialiserCertificateStore(ca, {isPEM: true, DEBUG: false})  // chiffrage
-  //       // await transfertFichiers.proxy.up_setCertificatCa(ca)  //  Note : pas necessaire, cles secrets chiffrages via contenu message
-
-  //       // Valider message
-  //       const idmgCalcule = await chiffrage.proxy.getIdmgLocal()
-  //       if(config.idmg && config.idmg != idmgCalcule) throw new Error("IDMG mismatch")
-  //       const resultat = await chiffrage.proxy.verifierMessage(fiche)
-  //       console.debug("Resultat validation fiche %s, IDMG calcule %s", resultat, idmgCalcule)
-  //     } else {
-  //       throw new Error("Certificat CA manquant de la fiche")
-  //     }
-
-  //     return true
-  //   })
-  //   .catch(err=>{
-  //     console.error("Erreur chargement config / fiche / chiffrage worker ", err)
-  //   })
-  
   const configPromise = loadConfiguration()
     .then(async config=>{
       configDao.setConfig(config)

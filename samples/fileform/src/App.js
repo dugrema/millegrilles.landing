@@ -2,7 +2,7 @@ import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'rea
 import { proxy as comlinkProxy } from 'comlink'
 import { useSelector, useDispatch } from 'react-redux'
 
-import { getToken, submitHtmlForm } from '@dugrema/millegrilles.reactjs/src/landing.js'
+import { getToken, submitHtmlForm, preparerFichiersBatch } from '@dugrema/millegrilles.reactjs/src/landing.js'
 
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
@@ -128,8 +128,9 @@ function FormApplication(props) {
     e.preventDefault()
     e.stopPropagation()
 
-    preparerFichiersBatch(batchId)
-      .then(async fichiers => {
+    chargerUploads(batchId)
+      .then(async fichiersBatch => {
+        const fichiers = await preparerFichiersBatch(fichiersBatch)
         console.debug("Fichiers : ", fichiers)
         const contenu = formatterMessage(champ1)
         const certificats = workers.config.getClesChiffrage()
@@ -330,44 +331,44 @@ function BoutonUpload(props) {
   )
 }
 
-async function preparerFichiersBatch(batchId) {
-  console.debug("preparerFichiersBatch Uploads batch %s", batchId)
-  const uploads = await chargerUploads(batchId)
-  if(uploads.length === 0) return null
+// async function preparerFichiersBatch(batchId) {
+//   console.debug("preparerFichiersBatch Uploads batch %s", batchId)
+//   const uploads = await chargerUploads(batchId)
+//   if(uploads.length === 0) return null
 
-  const nowEpoch = Math.floor(new Date().getTime() / 1000)
+//   const nowEpoch = Math.floor(new Date().getTime() / 1000)
 
-  const mapping = []
-  for await (let item of uploads) {
-    console.debug("preparerFichiersBatch Mapper ", item)
-    const transaction = item.transactionGrosfichiers
-    const mimetype = transaction.mimetype,
-          fuuid = transaction.fuuid,
-          cle = item.cle
+//   const mapping = []
+//   for await (let item of uploads) {
+//     console.debug("preparerFichiersBatch Mapper ", item)
+//     const transaction = item.transactionGrosfichiers
+//     const mimetype = transaction.mimetype,
+//           fuuid = transaction.fuuid,
+//           cle = item.cle
 
-    const fichier = {
-      name: item.nom,
-      date: nowEpoch,
-      size: item.taille,
-      digest: fuuid,
-      file: fuuid,
-      encrypted_size: item.taille_chiffree,
-      mimetype,
-      decryption: {
-        key: cle.cleSecrete,
-        header: cle.header, 
-        format: cle.format,
-      }
+//     const fichier = {
+//       name: item.nom,
+//       date: nowEpoch,
+//       size: item.taille,
+//       digest: fuuid,
+//       file: fuuid,
+//       encrypted_size: item.taille_chiffree,
+//       mimetype,
+//       decryption: {
+//         key: cle.cleSecrete,
+//         header: cle.header, 
+//         format: cle.format,
+//       }
 
-      // fuuid,
-      // mimetype,
-      // taille: item.taille,
-      // taille_chiffree: item.taille_chiffree,
-      // metadata: { ...item.metadataDechiffre },
-      // cle: item.cle,
-    }
-    mapping.push(fichier)
-  }
+//       // fuuid,
+//       // mimetype,
+//       // taille: item.taille,
+//       // taille_chiffree: item.taille_chiffree,
+//       // metadata: { ...item.metadataDechiffre },
+//       // cle: item.cle,
+//     }
+//     mapping.push(fichier)
+//   }
 
-  return mapping
-}
+//   return mapping
+// }
