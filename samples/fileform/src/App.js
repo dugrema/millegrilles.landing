@@ -104,6 +104,7 @@ function FormApplication(props) {
   const token = useSelector(state=>state.uploader.token)
   const batchId = useSelector(state=>state.uploader.batchId)
   const progres = useSelector(state=>state.uploader.progres)
+  const uploadActif = useSelector(state=>state.uploader.uploadActif)
   const liste = useSelector(state=>state.uploader.listeBatch)
 
   const workers = useWorkers(),
@@ -181,7 +182,10 @@ function FormApplication(props) {
 
       <br/>
 
-      <landingReact.ProgresUpload dispatch={dispatch} progres={progres} preparation={preparationUploadEnCours} />
+      <landingReact.ProgresUpload 
+        dispatch={dispatch} progres={progres} preparation={preparationUploadEnCours} 
+        actif={uploadActif}
+        />
 
       <br/>
 
@@ -228,8 +232,9 @@ function ListeFichiers(props) {
   const mapFichiers = useMemo(()=>{
     if(!fichiers) return ''
     return fichiers.map(item=>{
+      const fuuid = item.transactionGrosfichiers.fuuid
       return (
-        <Row>
+        <Row key={fuuid}>
           <Col>{item.nom}</Col>
           <Col>{item.taille} bytes</Col>
           <Col>{item.transactionGrosfichiers.mimetype}</Col>
