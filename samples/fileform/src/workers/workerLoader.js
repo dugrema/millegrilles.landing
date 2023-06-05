@@ -1,8 +1,10 @@
 import { wrap, releaseProxy } from 'comlink'
 
-import { loadConfiguration, ConfigDao } from '@dugrema/millegrilles.reactjs/src/landing.js'
+import { loadConfiguration, ConfigDao } from '@dugrema/millegrilles.reactjs/src/landing/landing.js'
+import * as uploadFichiersDao from '@dugrema/millegrilles.reactjs/src/landing/uploaderIdbDao'
 
-import * as uploadFichiersDao from '../redux/uploaderIdbDao'
+// Note : erreur Comlink (function not cloneable) si import de lib externe
+// import setupTraitementFichiers from '@dugrema/millegrilles.reactjs/src/landing/traitementFichiers'
 import setupTraitementFichiers from './traitementFichiers'
 
 // Exemple de loader pour web workers

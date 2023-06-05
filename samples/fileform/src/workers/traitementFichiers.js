@@ -1,4 +1,5 @@
-import { ajouterUpload } from '../redux/uploaderSlice'
+import { ajouterUpload } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
+
 import * as Comlink from 'comlink'
 
 function setup(workers) {
@@ -7,9 +8,7 @@ function setup(workers) {
             opts = opts || {}
             return traiterAcceptedFiles(workers, dispatch, params, opts)
         },
-        // resLoader,
         clean,
-        // downloadCache,
     }
 }
 
@@ -18,7 +17,6 @@ export default setup
 async function clean(urlBlobPromise) {
     try {
         const urlBlob = await urlBlobPromise
-        // console.debug("Cleanup blob %s", urlBlob)
         URL.revokeObjectURL(urlBlob)
     } catch(err) {
         console.debug("Erreur cleanup URL Blob : %O", err)
@@ -27,23 +25,19 @@ async function clean(urlBlobPromise) {
 
 async function traiterAcceptedFiles(workers, dispatch, params, opts) {
     opts = opts || {}
-    console.debug("Workers : ", workers)
-    const { acceptedFiles, token, batchId, cuuid } = params
+    // console.debug("Workers : ", workers)
+    const { acceptedFiles, batchId } = params
     const { setProgres, signalAnnuler } = opts
     const { transfertFichiers } = workers
     console.debug("traiterAcceptedFiles Debut pour batchId %s, fichiers %O", batchId, acceptedFiles)
 
-    // const certificatsMaitredescles = await workers.config.getClesChiffrage()
-    // await transfertFichiers.up_setCertificats(certificatsMaitredescles)
-    // console.debug("Certificat maitre des cles OK")
-
     const ajouterPartProxy = Comlink.proxy(
-        (correlation, compteurPosition, chunk) => ajouterPart(workers, batchId, correlation, compteurPosition, chunk)
+        (correlation, compteurPosition, chunk) => {
+            ajouterPart(workers, batchId, correlation, compteurPosition, chunk)
+        }
     )
     const updateFichierProxy = Comlink.proxy((doc, opts) => {
-        console.debug("updateFichierProxy doc recu : ", doc)
         const docWithIds = {...doc, batchId}
-        console.debug("updateFichierProxy Conserver ", docWithIds)
         return updateFichier(workers, dispatch, docWithIds, opts)
     })
     const setProgresProxy = setProgres?Comlink.proxy(setProgres):null
@@ -54,6 +48,7 @@ async function traiterAcceptedFiles(workers, dispatch, params, opts) {
         setProgresProxy,
         signalAnnuler
     )
+
     return resultat
 }
 

@@ -2,7 +2,11 @@ import { Suspense, useState, useCallback, useEffect, useMemo, useRef } from 'rea
 import { proxy as comlinkProxy } from 'comlink'
 import { useSelector, useDispatch } from 'react-redux'
 
-import { getToken, submitHtmlForm, preparerFichiersBatch } from '@dugrema/millegrilles.reactjs/src/landing.js'
+// Imports landing
+import { ErrorBoundary, landingReact } from '@dugrema/millegrilles.reactjs'
+import { getToken, submitHtmlForm, preparerFichiersBatch } from '@dugrema/millegrilles.reactjs/src/landing/landing.js'
+import { setToken, clearToken } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
+import { chargerUploads } from '@dugrema/millegrilles.reactjs/src/landing/uploaderIdbDao'
 
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
@@ -11,11 +15,7 @@ import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import Alert from 'react-bootstrap/Alert'
 
-import ErrorBoundary from './ErrorBoundary'
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
-// import { chiffrerMessage } from './messageUtils'
-import { setToken, clearToken } from './redux/uploaderSlice'
-import { chargerUploads } from './redux/uploaderIdbDao'
 
 // Importer JS global
 import 'react-bootstrap/dist/react-bootstrap.min.js'
@@ -59,12 +59,10 @@ function LayoutMain(props) {
 
   useEffect(()=>{
     if(token || !config) return  // Rien a faire
-    // getToken(urlConnexion, config.application_id)
     getToken(config, {urlConnexion})
       .then(data=>{
         console.debug("Token data ", data)
         dispatch(setToken({token: data.token, batchId: data.uuid_transaction}))
-        // dispatch() // TODO Set correlation Id
       })
       .catch(err=>console.error("Erreur chargement token ", err))
   }, [dispatch, config, urlConnexion, token])
@@ -105,6 +103,8 @@ function FormApplication(props) {
 
   const token = useSelector(state=>state.uploader.token)
   const batchId = useSelector(state=>state.uploader.batchId)
+  const progres = useSelector(state=>state.uploader.progres)
+  const liste = useSelector(state=>state.uploader.listeBatch)
 
   const workers = useWorkers(),
         dispatch = useDispatch(),
@@ -121,6 +121,11 @@ function FormApplication(props) {
         signal: comlinkProxy(() => valeur)
     }
   }, [])
+
+  const transfertEnCours = useMemo(()=>{
+    if(progres || preparationUploadEnCours) return true
+    return false
+  }, [progres, preparationUploadEnCours])
 
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
 
@@ -142,13 +147,13 @@ function FormApplication(props) {
       .catch(err=>console.error("Erreur submit form ", err))
   }, [dispatch, batchId, urlConnexion, workers, config, champ1, token])
 
+  useEffect(()=>{
+    console.debug('Liste fichiers upload : ', liste)
+  }, [liste])
+
   return (
     <div>
       <h2>Form</h2>
-
-      {preparationUploadEnCours?
-        <p>Preparation upload : {preparationUploadEnCours}%</p>
-      :''}
 
       <Form.Group as={Row} controlId="champ1">
         <Form.Label column sm={4} md={2}>Champ 1</Form.Label>
@@ -157,23 +162,34 @@ function FormApplication(props) {
         </Col>
       </Form.Group>
 
+
+      <h3>Fichiers</h3>
+
       <Row>
         <Col>
-          <BoutonUpload 
+          <landingReact.BoutonUpload 
+            traitementFichiers={workers.traitementFichiers}
+            dispatch={dispatch}
             setPreparationUploadEnCours={setPreparationUploadEnCours} 
             signalAnnuler={signalAnnuler.signal}
             token={token}
             batchId={batchId}>
             <i className="fa fa-plus"/> Fichier
-          </BoutonUpload>
+          </landingReact.BoutonUpload>
         </Col>
       </Row>
 
       <br/>
 
+      <landingReact.ProgresUpload dispatch={dispatch} progres={progres} preparation={preparationUploadEnCours} />
+
+      <br/>
+
+      <ListeFichiers fichiers={liste} />
+
       <Row>
         <Col>
-          <Button onClick={submitHandler}>Submit</Button>
+          <Button onClick={submitHandler} disabled={transfertEnCours}>Submit</Button>
         </Col>
       </Row>
 
@@ -206,169 +222,27 @@ async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiff
   return reponse
 }
 
-// async function submitForm(urlConnexion, workers, contenu, token, certifcatsChiffragePem, opts) {
-//   opts = opts || {}
-//   const application_id = opts.application_id
+function ListeFichiers(props) {
+  const { fichiers } = props
 
-//   const from = 'Landing page'
-//   const subject = 'Sample Form ' + new Date()
-//   const optionsMessage = { subject, /*to: ['Sample Form Handler']*/ }
-//   if(opts.fichiers) optionsMessage.files = opts.fichiers
+  const mapFichiers = useMemo(()=>{
+    if(!fichiers) return ''
+    return fichiers.map(item=>{
+      return (
+        <Row>
+          <Col>{item.nom}</Col>
+          <Col>{item.taille} bytes</Col>
+          <Col>{item.transactionGrosfichiers.mimetype}</Col>
+        </Row>
+      )
+    })
+  }, [fichiers])
 
-//   const headerContenu = `
-//   <p>--- HEADER ---</p>
-//   <div class='header'>
-//     <p>Application Id : ${application_id}</p>
-//     <p>Date client : ${''+new Date()}</p>
-//   </div>
-//   <p>--- FIN HEADER ---</p>
-//   <p> </p>
-//   `
-//   const contenuAvecHeader = headerContenu + contenu
-
-//   const messageChiffre = await chiffrerMessage(workers, certifcatsChiffragePem, from, contenuAvecHeader, optionsMessage)
-//   console.debug("Message chiffre : ", messageChiffre)
-
-//   const axiosImport = await import('axios')
-
-//   const url = new URL(urlConnexion)
-//   url.pathname = url.pathname + '/public/submit'
-
-//   const reponse = await axiosImport.default({
-//     method: 'POST',
-//     url: url.href,
-//     data: {message: messageChiffre, token},
-//   })
-
-//   return reponse.data
-// }
-
-function BoutonUpload(props) {
-
-  const { setPreparationUploadEnCours, signalAnnuler, token, batchId } = props
-
-  const refUpload = useRef()
-  const workers = useWorkers()
-  // const usager = useUsager()
-  const dispatch = useDispatch()
-  // const cuuid = useSelector(state=>state.fichiers.cuuid)
-
-  const [className, setClassName] = useState('')
-
-  const { traitementFichiers } = workers
-
-  const handlerPreparationUploadEnCours = useCallback(event=>{
-      // console.debug('handlerPreparationUploadEnCours ', event)
-      setPreparationUploadEnCours(event)
-  }, [setPreparationUploadEnCours])
-
-  const upload = useCallback( acceptedFiles => {
-      console.debug("Files : %O pour correlationSubmitId: %s, signalAnnuler: %O", acceptedFiles, batchId, signalAnnuler)
-      
-      handlerPreparationUploadEnCours(0)  // Debut preparation
-
-      traitementFichiers.traiterAcceptedFiles(dispatch, {acceptedFiles, token, batchId}, {signalAnnuler, setProgres: handlerPreparationUploadEnCours})
-          .then(()=>{
-              // const correlationIds = uploads.map(item=>item.correlation)
-              // return dispatch(demarrerUploads(workers, correlationIds))
-          })
-          .catch(err=>console.error("Erreur fichiers : %O", err))
-          .finally( () => handlerPreparationUploadEnCours(false) )
-
-  }, [handlerPreparationUploadEnCours, traitementFichiers, dispatch, token, batchId])
-
-  const fileChange = event => {
-      event.preventDefault()
-      setClassName('')
-
-      const acceptedFiles = event.currentTarget.files
-      upload(acceptedFiles)
-  }
-
-  const onButtonDrop = event => {
-      event.preventDefault()
-      setClassName('')
-
-      const acceptedFiles = event.dataTransfer.files
-      upload(acceptedFiles)
-  }
-
-  const handlerOnDragover = event => {
-      event.preventDefault()
-      setClassName('dropping')
-      event.dataTransfer.dropEffect = "move"
-  }
-
-  const handlerOnDragLeave = event => { event.preventDefault(); setClassName(''); }
-
-  const handlerOnClick = event => {
-      refUpload.current.click()
-  }
+  if(!fichiers || fichiers.length === 0) return ''
 
   return (
-      <div 
-          className={'upload ' + className}
-          onDrop={onButtonDrop}
-          onDragOver={handlerOnDragover} 
-          onDragLeave={handlerOnDragLeave}
-        >
-          <Button 
-              variant="secondary" 
-              className="individuel"
-              onClick={handlerOnClick}
-              disabled={!token}
-            >
-              {props.children}
-          </Button>
-          <input
-              id='file_upload'
-              type='file' 
-              ref={refUpload}
-              multiple
-              onChange={fileChange}
-            />
-      </div>
+    <div>
+      {mapFichiers}
+    </div>
   )
 }
-
-// async function preparerFichiersBatch(batchId) {
-//   console.debug("preparerFichiersBatch Uploads batch %s", batchId)
-//   const uploads = await chargerUploads(batchId)
-//   if(uploads.length === 0) return null
-
-//   const nowEpoch = Math.floor(new Date().getTime() / 1000)
-
-//   const mapping = []
-//   for await (let item of uploads) {
-//     console.debug("preparerFichiersBatch Mapper ", item)
-//     const transaction = item.transactionGrosfichiers
-//     const mimetype = transaction.mimetype,
-//           fuuid = transaction.fuuid,
-//           cle = item.cle
-
-//     const fichier = {
-//       name: item.nom,
-//       date: nowEpoch,
-//       size: item.taille,
-//       digest: fuuid,
-//       file: fuuid,
-//       encrypted_size: item.taille_chiffree,
-//       mimetype,
-//       decryption: {
-//         key: cle.cleSecrete,
-//         header: cle.header, 
-//         format: cle.format,
-//       }
-
-//       // fuuid,
-//       // mimetype,
-//       // taille: item.taille,
-//       // taille_chiffree: item.taille_chiffree,
-//       // metadata: { ...item.metadataDechiffre },
-//       // cle: item.cle,
-//     }
-//     mapping.push(fichier)
-//   }
-
-//   return mapping
-// }

@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit'
-import uploader, { uploaderMiddlewareSetup } from './uploaderSlice'
+import uploader, { uploaderMiddlewareSetup } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
 
 function storeSetup(workers) {
 
@@ -11,14 +11,10 @@ function storeSetup(workers) {
     },
 
     middleware: (getDefaultMiddleware) => {
-      
-      // const { dechiffrageMiddleware } = setupMessages(workers)
       const uploaderMiddleware = uploaderMiddlewareSetup(workers)
-
       // Prepend, evite le serializability check
       return getDefaultMiddleware()
         .prepend(uploaderMiddleware.middleware)
-
     },
   })
 
