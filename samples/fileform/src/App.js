@@ -8,12 +8,12 @@ import { getToken, submitHtmlForm, preparerFichiersBatch } from '@dugrema/milleg
 import { setToken, clearToken, clearUploadsState, setBatchUpload } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
 import { chargerUploads } from '@dugrema/millegrilles.reactjs/src/landing/uploaderIdbDao'
 
+import Alert from 'react-bootstrap/Alert'
 import Container from 'react-bootstrap/Container'
 import Row from 'react-bootstrap/Row'
 import Col from 'react-bootstrap/Col'
 import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
-import Alert from 'react-bootstrap/Alert'
 
 import useWorkers, { WorkerProvider, useEtatPret, useUrlConnexion, useConfig } from './WorkerContext'
 
