@@ -1,8 +1,9 @@
 REPO=docker.maceroc.com
 NAME=millegrilles_landing_web
 ARCH_SUPPORTEES=( x86_64 aarch64 )
-URL_SERVEUR_DEV=mathieu@mg-dev1.maple.maceroc.com
 BRANCH=`git rev-parse --abbrev-ref HEAD`
 BUILD=0
 
 VERSION=$BRANCH.$BUILD
+
+URL_SERVEUR_DEV=mathieu@webappsrc
