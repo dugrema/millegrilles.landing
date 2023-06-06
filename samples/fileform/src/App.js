@@ -186,10 +186,15 @@ function FormApplication(props) {
 
   const clearHandler = useCallback(()=>{
     setChamp1('')
+    window.localStorage.removeItem('champ1')
     clear()
   }, [clear, setChamp1])
 
-  const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
+  const champ1ChangeHandler = useCallback(e=>{
+    const value = e.currentTarget.value
+    setChamp1(value)
+    window.localStorage.setItem('champ1', value)
+  }, [setChamp1])
 
   const submitHandler = useCallback( e => {
     e.preventDefault()
@@ -201,18 +206,23 @@ function FormApplication(props) {
         console.debug("Fichiers : ", fichiers)
         const contenu = formatterMessage(champ1)
         const certificats = workers.config.getClesChiffrage()
+
         console.debug("Submit %O, certificats %O", contenu, certificats)
         const r = await submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id, fichiers})
         console.debug("Reponse submit ", r)
         setSubmitEtat(true)
         dispatch(clearToken())
+
+        // Clear champs
+        window.localStorage.removeItem('champ1')
       })
       .catch(err=>console.error("Erreur submit form ", err))
   }, [dispatch, batchId, urlConnexion, workers, config, champ1, token, setSubmitEtat])
 
   useEffect(()=>{
-    console.debug('Liste fichiers upload : ', liste)
-  }, [liste])
+    // Charger champs persistes
+    setChamp1(window.localStorage.getItem('champ1') || '')
+  }, [setChamp1])
 
   return (
     <div>
