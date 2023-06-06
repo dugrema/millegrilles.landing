@@ -1,7 +1,7 @@
 import debugLib from 'debug'
 const debug = debugLib('landing:protectionpublique')
 
-const EXPIRATION_RATE_REDIS = 300  // en secondes
+const EXPIRATION_RATE_REDIS = 120  // en secondes
 const HIT_RATE_GENERAL = 100  // Hits max par periode
 const HIT_RATE_TOKEN = 50     // Hits max par periode
 const TYPERATE_LANDING_GENERAL = 'general',

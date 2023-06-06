@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from 'react-redux'
 // Imports landing
 import { ErrorBoundary, landingReact } from '@dugrema/millegrilles.reactjs'
 import { getToken, submitHtmlForm, preparerFichiersBatch } from '@dugrema/millegrilles.reactjs/src/landing/landing.js'
-import { setToken, clearToken } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
+import { setToken, clearToken, clearUploadsState, setBatchUpload } from '@dugrema/millegrilles.reactjs/src/landing/uploaderSlice'
 import { chargerUploads } from '@dugrema/millegrilles.reactjs/src/landing/uploaderIdbDao'
 
 import Container from 'react-bootstrap/Container'
@@ -52,20 +52,59 @@ function LayoutMain(props) {
   const token = useSelector(state=>state.uploader.token)
   const batchId = useSelector(state=>state.uploader.batchId)
 
+  const [submitEtat, setSubmitEtat] = useState('')
+
   const tokenFormatte = useMemo(()=>{
     if(!token) return ''
     return token.replaceAll('\.', '\. ')
   }, [token])
 
+  const nouveauHandler = useCallback(()=>{
+    dispatch(clearUploadsState())
+    dispatch(clearToken())
+    
+    setSubmitEtat(false)
+    
+    window.localStorage.removeItem('token')
+    window.localStorage.removeItem('batchId')
+
+    workers.uploadFichiersDao.clear()
+      .catch(err=>console.error("Erreur suppression fichiers upload : ", err))
+  }, [workers, dispatch, setSubmitEtat])
+
   useEffect(()=>{
-    if(token || !config) return  // Rien a faire
-    getToken(config, {urlConnexion})
-      .then(data=>{
-        console.debug("Token data ", data)
-        dispatch(setToken({token: data.token, batchId: data.uuid_transaction}))
-      })
-      .catch(err=>console.error("Erreur chargement token ", err))
-  }, [dispatch, config, urlConnexion, token])
+    if(submitEtat === true || token || !config) return  // Rien a faire
+
+    // Verifier si on charge avec localStorage
+    let tokenStorage = window.localStorage.getItem('token')
+    let batchId = window.localStorage.getItem('batchId')
+    console.debug("LayoutMain localStorage batch id %s\nToken: %s", batchId, tokenStorage)
+    if(tokenStorage && batchId) {
+      console.debug("LayoutMain reutiliser batchId %s", batchId)
+      dispatch(setToken({token: tokenStorage, batchId}))
+
+      // Recharger les fichiers deja uploades
+      workers.uploadFichiersDao.chargerUploads(batchId)
+        .then(uploads=>{
+          console.debug("Uploads existants ", uploads)
+          dispatch(setBatchUpload(uploads))
+        })
+        .catch(err=>console.error("Erreur chargement fichiers existants : ", err))
+
+    } else {
+      console.debug("LayoutMain Demander nouveau token")
+      getToken(config, {urlConnexion})
+        .then(data=>{
+          console.debug("Token data ", data)
+          dispatch(setToken({token: data.token, batchId: data.uuid_transaction}))
+          
+          console.debug("Store token/batchId dans localStorage")
+          window.localStorage.setItem('token', data.token)
+          window.localStorage.setItem('batchId', data.uuid_transaction)
+        })
+        .catch(err=>console.error("Erreur chargement token ", err))
+      }
+  }, [dispatch, config, urlConnexion, token, submitEtat])
 
   useEffect(()=>{
     const urlUpload = urlConnexion + '/public/fichiers'
@@ -73,6 +112,16 @@ function LayoutMain(props) {
     workers.transfertFichiers.up_setPathServeur(urlUpload)
       .catch(err=>console.error("Erreur changement URL connexion pour upload", err))
   }, [workers, urlConnexion])
+
+  useEffect(()=>{
+    if(submitEtat === true) {
+      // Clear database
+      workers.uploadFichiersDao.clear()
+        .catch(err=>console.error("Erreur suppression fichiers upload : ", err))
+      window.localStorage.removeItem('token')
+      window.localStorage.removeItem('batchId')
+    }
+  }, [workers, submitEtat])
 
   return (
     <Container>
@@ -89,7 +138,12 @@ function LayoutMain(props) {
         </div>
       </Alert>
 
-      <FormApplication />
+      {submitEtat===true?
+        <SubmitOk nouveau={nouveauHandler} />
+      :
+        <FormApplication setSubmitEtat={setSubmitEtat} clear={nouveauHandler} />
+      }
+
 
     </Container>
   )
@@ -100,6 +154,8 @@ function Attente(props) {
 }
 
 function FormApplication(props) {
+
+  const { setSubmitEtat, clear } = props
 
   const token = useSelector(state=>state.uploader.token)
   const batchId = useSelector(state=>state.uploader.batchId)
@@ -124,9 +180,14 @@ function FormApplication(props) {
   }, [])
 
   const transfertEnCours = useMemo(()=>{
-    if(progres || preparationUploadEnCours) return true
+    if(progres || uploadActif) return true
     return false
   }, [progres, preparationUploadEnCours])
+
+  const clearHandler = useCallback(()=>{
+    setChamp1('')
+    clear()
+  }, [clear, setChamp1])
 
   const champ1ChangeHandler = useCallback(e=>setChamp1(e.currentTarget.value), [setChamp1])
 
@@ -143,10 +204,11 @@ function FormApplication(props) {
         console.debug("Submit %O, certificats %O", contenu, certificats)
         const r = await submitForm(urlConnexion, workers, contenu, token, certificats, {application_id: config.application_id, fichiers})
         console.debug("Reponse submit ", r)
+        setSubmitEtat(true)
         dispatch(clearToken())
       })
       .catch(err=>console.error("Erreur submit form ", err))
-  }, [dispatch, batchId, urlConnexion, workers, config, champ1, token])
+  }, [dispatch, batchId, urlConnexion, workers, config, champ1, token, setSubmitEtat])
 
   useEffect(()=>{
     console.debug('Liste fichiers upload : ', liste)
@@ -162,7 +224,6 @@ function FormApplication(props) {
             <Form.Control value={champ1} onChange={champ1ChangeHandler} />
         </Col>
       </Form.Group>
-
 
       <h3>Fichiers</h3>
 
@@ -194,10 +255,34 @@ function FormApplication(props) {
       <Row>
         <Col>
           <Button onClick={submitHandler} disabled={transfertEnCours}>Submit</Button>
+          <Button variant="secondary" onClick={clearHandler} disabled={transfertEnCours}>Annuler</Button>
         </Col>
       </Row>
 
     </div>
+  )
+}
+
+function SubmitOk(props) {
+
+  const { nouveau } = props
+
+  const workers = useWorkers()  
+
+  const nouveauHandler = useCallback(()=>{
+    nouveau()
+  }, [nouveau])
+
+  return (
+    <Alert variant='success'>
+      <Alert.Heading>Message envoye</Alert.Heading>
+      <p>Message emis avec succes.</p>
+      <Row>
+        <Col>
+          <Button onClick={nouveauHandler}>Nouveau message</Button>
+        </Col>
+      </Row>
+    </Alert>
   )
 }
 
@@ -232,14 +317,18 @@ function ListeFichiers(props) {
   const mapFichiers = useMemo(()=>{
     if(!fichiers) return ''
     return fichiers.map(item=>{
-      const fuuid = item.transactionGrosfichiers.fuuid
-      return (
-        <Row key={fuuid}>
-          <Col>{item.nom}</Col>
-          <Col>{item.taille} bytes</Col>
-          <Col>{item.transactionGrosfichiers.mimetype}</Col>
-        </Row>
-      )
+      try {
+        const fuuid = item.transactionGrosfichiers.fuuid
+        return (
+          <Row key={fuuid}>
+            <Col>{item.nom}</Col>
+            <Col>{item.taille} bytes</Col>
+            <Col>{item.transactionGrosfichiers.mimetype}</Col>
+          </Row>
+        )
+      } catch(err) {
+        console.warn("Erreur affichage transaction grosfichiers %O : %O", item, err)
+      }
     })
   }, [fichiers])
 
