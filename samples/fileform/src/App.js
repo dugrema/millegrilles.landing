@@ -62,14 +62,8 @@ function LayoutMain(props) {
   const nouveauHandler = useCallback(()=>{
     dispatch(clearUploadsState())
     dispatch(clearToken())
-    
     setSubmitEtat(false)
-    
-    window.localStorage.removeItem('token')
-    window.localStorage.removeItem('batchId')
-
-    workers.uploadFichiersDao.clear()
-      .catch(err=>console.error("Erreur suppression fichiers upload : ", err))
+    cleanup(workers, dispatch)
   }, [workers, dispatch, setSubmitEtat])
 
   useEffect(()=>{
@@ -116,10 +110,7 @@ function LayoutMain(props) {
   useEffect(()=>{
     if(submitEtat === true) {
       // Clear database
-      workers.uploadFichiersDao.clear()
-        .catch(err=>console.error("Erreur suppression fichiers upload : ", err))
-      window.localStorage.removeItem('token')
-      window.localStorage.removeItem('batchId')
+      cleanup(workers)
     }
   }, [workers, submitEtat])
 
@@ -349,4 +340,17 @@ function ListeFichiers(props) {
       {mapFichiers}
     </div>
   )
+}
+
+function cleanup(workers, dispatch) {
+  window.localStorage.removeItem('token')
+  window.localStorage.removeItem('batchId')
+
+  if(dispatch) {
+    dispatch(clearUploadsState())
+    dispatch(clearToken())
+  }
+
+  workers.uploadFichiersDao.clear()
+    .catch(err=>console.error("Erreur suppression fichiers upload : ", err))
 }
