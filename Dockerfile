@@ -1,4 +1,4 @@
-FROM docker.maceroc.com/millegrilles_webappbase:2023.5.0
+FROM docker.maple.maceroc.com:5000/millegrilles_webappbase:2023.6.0
 
 ENV APP_FOLDER=/usr/src/app \
     NODE_ENV=production \
